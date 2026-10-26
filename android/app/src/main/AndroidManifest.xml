@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Only used to load your public games from Chess.com / Lichess. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:label="ply"
+        android:label="Ply"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
