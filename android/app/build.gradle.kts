@@ -80,6 +80,9 @@ android {
             useLegacyPackaging = true
             // Keep the Stockfish binary byte-identical to the official release.
             keepDebugSymbols += "**/libstockfish.so"
+            // Plugins add stray libs for ABIs Ply cannot run on; drop them so the
+            // APK only installs on arm64 devices.
+            excludes += listOf("lib/armeabi-v7a/**", "lib/x86_64/**", "lib/x86/**")
         }
     }
 
