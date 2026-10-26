@@ -1,122 +1,202 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-void main() {
-  runApp(const MyApp());
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+
+import 'analysis/openings.dart';
+import 'engine/engine_service.dart';
+import 'storage/game_store.dart';
+import 'storage/settings.dart';
+import 'ui/analysis_controller.dart';
+import 'ui/analyze_screen.dart';
+import 'ui/board/chess_board.dart';
+import 'ui/games_screen.dart';
+import 'ui/insights_screen.dart';
+import 'ui/services.dart';
+import 'ui/settings_screen.dart';
+import 'ui/theme.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final dir = await getApplicationDocumentsDirectory();
+  final settings = Settings(dir);
+  await settings.load();
+  final store = GameStore(dir);
+  await store.load();
+  final engine = EngineService(
+    threads: settings.threads,
+    hashMb: settings.hashMb,
+  );
+  final analysis = AnalysisController(
+    engine: engine,
+    store: store,
+    settings: settings,
+  );
+  LicenseRegistry.addLicense(bundledLicenses);
+  unawaited(precachePieces());
+  // Opening names / theory detection load in a background isolate.
+  unawaited(OpeningBook.load().then(analysis.setBook));
+  runApp(
+    Services(
+      store: store,
+      settings: settings,
+      engine: engine,
+      analysis: analysis,
+      tab: ValueNotifier(0),
+      child: const PlyApp(),
+    ),
+  );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// Licenses for components that are not Dart packages (those are collected
+/// automatically by Flutter).
+Stream<LicenseEntry> bundledLicenses() async* {
+  final gpl3 = await rootBundle.loadString('assets/licenses/GPL-3.0.txt');
+  final gpl2 = await rootBundle.loadString('assets/licenses/GPL-2.0.txt');
+  yield LicenseEntryWithLineBreaks(
+    ['Stockfish 19'],
+    '''
+Stockfish 19, a UCI chess engine. Copyright (C) 2004-2026 The Stockfish developers (see AUTHORS file).
+Ply bundles the unmodified official binary "stockfish-android-arm64-universal" from
+https://github.com/official-stockfish/Stockfish/releases/tag/sf_19 . The complete corresponding
+source code is available at that release (tag sf_19) and is included in the release archive.
+Stockfish is free software under the GNU General Public License version 3.
 
-  // This widget is the root of your application.
+$gpl3''',
+  );
+  yield LicenseEntryWithLineBreaks(
+    ['Cburnett chess pieces'],
+    '''
+Chess piece artwork by Colin M. L. Burnett (Cburnett), unmodified SVG files from the Lichess
+repository (lichess-org/lila, public/piece/cburnett), distributed under the GNU General Public
+License version 2 or later. The originals on Wikimedia Commons are also available under
+GFDL 1.2+, CC BY-SA 3.0 and BSD licenses.
+
+$gpl2''',
+  );
+  yield const LicenseEntryWithLineBreaks(
+    ['Lichess chess-openings'],
+    '''
+Opening names from https://github.com/lichess-org/chess-openings (commit a6189a30),
+dedicated to the public domain under CC0 1.0 Universal.''',
+  );
+}
+
+class PlyApp extends StatelessWidget {
+  const PlyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+    final settings = Services.of(context).settings;
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) => MaterialApp(
+        title: 'Ply',
+        debugShowCheckedModeBanner: false,
+        theme: plyTheme(Brightness.light),
+        darkTheme: plyTheme(Brightness.dark),
+        themeMode: settings.themeMode,
+        home: const HomeShell(),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class HomeShell extends StatefulWidget {
+  const HomeShell({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<HomeShell> createState() => _HomeShellState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
+  static const _pages = [
+    AnalyzeScreen(),
+    GamesScreen(),
+    InsightsScreen(),
+    SettingsScreen(),
+  ];
+  static const _dest = [
+    (Icons.grid_view_outlined, Icons.grid_view_rounded, 'Analyze'),
+    (Icons.folder_outlined, Icons.folder, 'Games'),
+    (Icons.insights_outlined, Icons.insights, 'Insights'),
+    (Icons.tune_outlined, Icons.tune, 'Settings'),
+  ];
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Don't burn battery on live analysis nobody is looking at.
+    final a = Services.of(context).analysis;
+    if (state == AppLifecycleState.paused && a.engineOn) a.toggleEngine();
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
+    final tab = Services.of(context).tab;
+    return ValueListenableBuilder<int>(
+      valueListenable: tab,
+      builder: (context, i, _) {
+        final wide = MediaQuery.sizeOf(context).width >= 840;
+        final body = IndexedStack(index: i, children: _pages);
+        return PopScope(
+          canPop: i == 0,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) tab.value = 0;
+          },
+          child: Scaffold(
+            body: wide
+                ? Row(
+                    children: [
+                      NavigationRail(
+                        selectedIndex: i,
+                        onDestinationSelected: (v) => tab.value = v,
+                        labelType: NavigationRailLabelType.all,
+                        destinations: [
+                          for (final d in _dest)
+                            NavigationRailDestination(
+                              icon: Icon(d.$1),
+                              selectedIcon: Icon(d.$2),
+                              label: Text(d.$3),
+                            ),
+                        ],
+                      ),
+                      const VerticalDivider(width: 1),
+                      Expanded(child: body),
+                    ],
+                  )
+                : body,
+            bottomNavigationBar: wide
+                ? null
+                : NavigationBar(
+                    selectedIndex: i,
+                    height: 64,
+                    onDestinationSelected: (v) => tab.value = v,
+                    destinations: [
+                      for (final d in _dest)
+                        NavigationDestination(
+                          icon: Icon(d.$1),
+                          selectedIcon: Icon(d.$2),
+                          label: d.$3,
+                        ),
+                    ],
+                  ),
+          ),
+        );
+      },
     );
   }
 }
