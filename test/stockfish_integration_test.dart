@@ -79,7 +79,8 @@ void main() {
     final moves = reviewMoves(g, data, const Thresholds());
     expect(moves[5]!.cls, MoveClass.blunder);
     expect(moves[5]!.tags, contains(MoveTag.allowedMate));
-    expect(moves[6]!.cls, MoveClass.best);
+    // Mate in one: every other move is far worse, so it is the only move that holds.
+    expect(moves[6]!.cls, MoveClass.critical);
     expect(summarize(moves, Side.black).counts[MoveClass.blunder], 1);
   }, skip: skip);
 }

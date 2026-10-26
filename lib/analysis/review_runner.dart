@@ -12,6 +12,7 @@ Future<GameReview> runReview({
   required UciEngine engine,
   required ChessGame game,
   required int depth,
+  int multiPv = 2,
   GameReview? resume,
   bool Function()? isCancelled,
   void Function(GameReview partial)? onProgress,
@@ -41,6 +42,7 @@ Future<GameReview> runReview({
         moves: game.ucisBefore(i),
         turn: pos.turn,
         depth: depth,
+        multiPv: multiPv,
       );
       if (!r.complete) break; // stopped: keep only fully searched positions
       positions[i] = PositionAnalysis(
@@ -48,6 +50,7 @@ Future<GameReview> runReview({
         depth: r.depth,
         bestMove: r.bestMove,
         pv: r.best!.pv.take(10).toList(),
+        second: r.lines.length > 1 ? r.lines[1].eval : null,
       );
     }
     onProgress?.call(snapshot());
