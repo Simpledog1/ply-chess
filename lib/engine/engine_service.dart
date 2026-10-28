@@ -45,7 +45,11 @@ enum EngineStatus { idle, starting, ready, failed }
 /// Owns the single Stockfish instance used by the app. Starts it lazily and
 /// restarts it after a crash.
 class EngineService extends ChangeNotifier {
-  EngineService({this.threads = 2, this.hashMb = 64});
+  EngineService({this.threads = 2, this.hashMb = 64, this.connect});
+
+  /// Opens the engine connection; defaults to starting the bundled binary.
+  /// Tests pass a scripted engine.
+  final Future<EngineTransport> Function()? connect;
 
   static const _channel = MethodChannel('ply/engine');
 
@@ -72,11 +76,19 @@ class EngineService extends ChangeNotifier {
       }
       return path;
     }
-    final path = Platform.environment['STOCKFISH_PATH'];
-    if (path == null || !File(path).existsSync()) {
-      throw EngineException('Set STOCKFISH_PATH to a Stockfish binary.');
+    final override = Platform.environment['STOCKFISH_PATH'];
+    if (override != null && File(override).existsSync()) return override;
+    if (Platform.isWindows) {
+      // The installer puts the engine in a "stockfish" folder beside Ply.exe.
+      final exeDir = File(Platform.resolvedExecutable).parent.path;
+      final bundled = '$exeDir\\stockfish\\stockfish.exe';
+      if (File(bundled).existsSync()) return bundled;
+      throw EngineException(
+        'Stockfish is missing from the Ply folder ($bundled). '
+        'Reinstall Ply to restore it.',
+      );
     }
-    return path;
+    throw EngineException('Set STOCKFISH_PATH to a Stockfish binary.');
   }
 
   Future<UciEngine> get engine {
@@ -90,7 +102,9 @@ class EngineService extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      final transport = await ProcessTransport.start(await locateBinary());
+      final transport = connect != null
+          ? await connect!()
+          : await ProcessTransport.start(await locateBinary());
       final e = UciEngine(transport);
       await e.init(threads: threads, hashMb: hashMb);
       _engine = e;

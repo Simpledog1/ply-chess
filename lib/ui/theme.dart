@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../analysis/review.dart';
 
+/// Windows at least this wide get the three-column desktop layout.
+const desktopWidth = 1000.0;
+
 /// Accent blue from the design references ("Game Analysis" header).
 const plyBlue = Color(0xFF1C4DC4);
 

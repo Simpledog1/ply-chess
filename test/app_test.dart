@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ply/engine/engine_service.dart';
+import 'package:ply/online/games_browser.dart';
 import 'package:ply/main.dart';
 import 'package:ply/storage/game_store.dart';
 import 'package:ply/storage/settings.dart';
@@ -28,6 +29,7 @@ void main() {
         store: store,
         settings: settings,
       ),
+      browser: GamesBrowser(settings: settings),
       tab: ValueNotifier(0),
       child: const PlyApp(),
     );
@@ -60,7 +62,7 @@ void main() {
     await pumpApp(tester);
     expect(find.byType(ChessBoard), findsOneWidget);
     expect(find.byType(PieceImage), findsNWidgets(32));
-    for (final label in ['Analyze', 'Games', 'Insights', 'Settings']) {
+    for (final label in ['Analyze', 'History', 'Insights', 'Settings']) {
       expect(find.text(label), findsOneWidget);
     }
   });
@@ -105,11 +107,11 @@ void main() {
     expect(services.analysis.ply, 2);
   });
 
-  testWidgets('empty Games and Insights tabs explain what to do', (
+  testWidgets('empty History and Insights tabs explain what to do', (
     tester,
   ) async {
     await pumpApp(tester);
-    await tester.tap(find.text('Games'));
+    await tester.tap(find.text('History'));
     await tester.pump();
     expect(find.text('No saved games yet'), findsOneWidget);
     await tester.tap(find.text('Insights'));

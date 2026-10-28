@@ -4,9 +4,11 @@ import 'package:dartchess/dartchess.dart' show Chess, Side;
 import 'package:flutter/material.dart';
 
 import '../analysis/review.dart';
+import 'games_screen.dart' show HistoryStatus, profileLabel;
+import 'import_export.dart' show snack;
 import 'services.dart';
 
-const appVersion = '1.0.0';
+const appVersion = '1.1.0';
 const tagline = 'Every move teaches.';
 
 class SettingsScreen extends StatelessWidget {
@@ -57,12 +59,16 @@ class SettingsScreen extends StatelessWidget {
                 value: st.showCoordinates,
                 onChanged: (v) => st.update((x) => x.showCoordinates = v),
               ),
+              header('Profiles & privacy'),
+              const HistoryStatus(),
+              const _ProfilesSection(),
               header('You'),
               ListTile(
                 title: const Text('Your usernames'),
                 subtitle: Text(
                   st.usernames.isEmpty
-                      ? 'Used to detect which side you played in imported games'
+                      ? 'Extra names to detect your side in pasted PGNs '
+                            '(profile names are used automatically)'
                       : st.usernames.join(', '),
                 ),
                 trailing: const Icon(Icons.edit_outlined),
@@ -346,4 +352,132 @@ class _EngineCheckState extends State<_EngineCheck> {
         : const Icon(Icons.play_circle_outline),
     onTap: _running ? null : _run,
   );
+}
+
+/// Remembered profiles with their saved data, and delete buttons.
+class _ProfilesSection extends StatelessWidget {
+  const _ProfilesSection();
+
+  Future<bool> _confirm(
+    BuildContext context,
+    String title,
+    String body,
+  ) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(title),
+          content: Text(body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Services.of(context);
+    final st = s.settings;
+    return ListenableBuilder(
+      listenable: s.store,
+      builder: (context, _) {
+        final counts = s.store.countsByProfile();
+        final theme = Theme.of(context);
+        final muted = theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final p in st.profiles)
+              ListTile(
+                leading: Icon(
+                  p.key == st.currentProfile
+                      ? Icons.person
+                      : Icons.person_outline,
+                ),
+                title: Text(profileLabel(p.key)),
+                subtitle: Text(
+                  '${counts[p.key] ?? 0} saved game(s) · last used '
+                  '${p.lastUsed.toLocal().toString().substring(0, 16)}',
+                ),
+                trailing: IconButton(
+                  tooltip: 'Forget profile and delete its data',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () async {
+                    if (!await _confirm(
+                      context,
+                      'Delete ${profileLabel(p.key)}?',
+                      'Forgets this username and deletes its '
+                          '${counts[p.key] ?? 0} saved game(s) and analysis '
+                          'from this PC. Nothing on ${p.site.label} changes.',
+                    )) {
+                      return;
+                    }
+                    await s.store.deleteProfile(p.key);
+                    await st.forgetProfile(p.key);
+                    s.browser.forget(p.key);
+                    if (context.mounted) snack(context, 'Profile deleted');
+                  },
+                ),
+              ),
+            ListTile(
+              title: const Text('Games per page'),
+              subtitle: const Text('How many recent games to load at a time'),
+              trailing: DropdownButton<int>(
+                value: st.pageSize,
+                items: [
+                  for (final n in const [10, 20, 30, 50])
+                    DropdownMenuItem(value: n, child: Text('$n')),
+                ],
+                onChanged: (v) {
+                  if (v != null) st.update((x) => x.pageSize = v);
+                },
+              ),
+            ),
+            ListTile(
+              title: const Text('Delete all local history'),
+              subtitle: Text(
+                '${s.store.games.length} saved game(s), '
+                '${s.store.positions.length} pinned position(s)',
+              ),
+              trailing: const Icon(Icons.delete_forever_outlined),
+              enabled: s.store.games.isNotEmpty || s.store.positions.isNotEmpty,
+              onTap: () async {
+                if (!await _confirm(
+                  context,
+                  'Delete all local history?',
+                  'Removes every saved game, analysis and pinned position '
+                      'from this PC. Profiles and settings are kept.',
+                )) {
+                  return;
+                }
+                await s.store.deleteAll();
+                if (context.mounted) snack(context, 'Local history deleted');
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Text(
+                'Data folder: ${st.dir.path}\n'
+                'A username only tells Ply whose public games to load; it '
+                'does not prove the account is yours. Ply never asks for '
+                'passwords or tokens, sends nothing but the username to '
+                'Lichess or Chess.com, and is not affiliated with either.',
+                style: muted,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }

@@ -2,7 +2,9 @@ import 'dart:math' as math;
 
 import 'package:dartchess/dartchess.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../analysis/lessons.dart';
 import '../analysis/review.dart';
 import '../chess/chess_game.dart';
 import '../engine/engine_service.dart';
@@ -15,9 +17,12 @@ import 'board/eval_bar.dart';
 import 'games_screen.dart' show editGameDetails;
 import 'import_export.dart';
 import 'move_text.dart';
+import 'online_game_list.dart';
 import 'review_screen.dart';
 import 'services.dart';
 import 'theme.dart';
+
+part 'analyze_desktop.dart';
 
 /// Rebuilds every widget below that calls [watchAnalysis] when the analysis,
 /// settings or engine state changes (const widgets included).
@@ -41,6 +46,53 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
   Listenable? _changes;
 
   @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onKey);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    super.dispose();
+  }
+
+  /// Keyboard navigation: ←/→ move, Home/End (or ↑/↓) jump, F flip,
+  /// Space play/pause, E engine on/off. Ignored while typing or in dialogs.
+  bool _onKey(KeyEvent e) {
+    if (e is! KeyDownEvent && e is! KeyRepeatEvent) return false;
+    if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return false;
+    final s = Services.of(context);
+    if (s.tab.value != 0) return false;
+    final focus = FocusManager.instance.primaryFocus?.context;
+    if (focus != null &&
+        (focus.widget is EditableText ||
+            focus.findAncestorWidgetOfExactType<EditableText>() != null)) {
+      return false;
+    }
+    final a = s.analysis;
+    switch (e.logicalKey) {
+      case LogicalKeyboardKey.arrowLeft:
+        a.goTo(a.ply - 1);
+      case LogicalKeyboardKey.arrowRight:
+        a.goTo(a.ply + 1);
+      case LogicalKeyboardKey.home || LogicalKeyboardKey.arrowUp:
+        a.goTo(0);
+      case LogicalKeyboardKey.end || LogicalKeyboardKey.arrowDown:
+        a.goTo(a.game.length);
+      case LogicalKeyboardKey.keyF when e is KeyDownEvent:
+        a.flip();
+      case LogicalKeyboardKey.space when e is KeyDownEvent:
+        if (a.game.length > 0) a.toggleAutoplay();
+      case LogicalKeyboardKey.keyE when e is KeyDownEvent:
+        if (!a.reviewing) a.toggleEngine();
+      default:
+        return false;
+    }
+    return true;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final s = Services.of(context);
     _changes ??= Listenable.merge([s.analysis, s.settings, s.engine]);
@@ -50,6 +102,9 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, c) {
+              if (c.maxWidth >= desktopWidth) {
+                return _DesktopLayout(height: c.maxHeight);
+              }
               final wide = c.maxWidth > 700 && c.maxWidth > c.maxHeight;
               if (wide) {
                 return Padding(
@@ -460,19 +515,56 @@ class _Header extends StatelessWidget {
   }
 }
 
+/// Saves the current game to local history, offering to turn history on
+/// first (it is off by default).
+Future<void> saveToHistory(BuildContext context) async {
+  final s = Services.of(context);
+  if (!s.settings.saveHistory) {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Turn on local history?'),
+        content: const Text(
+          'Local history is off, so games and analysis are kept only until '
+          'Ply closes. Turning it on saves reviewed games on this PC (never '
+          'online). You can turn it off or delete the data in Settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Turn on and save'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await s.settings.update((x) => x.saveHistory = true);
+  }
+  await s.analysis.save();
+  if (context.mounted) snack(context, 'Saved to History');
+}
+
 class _IconRow extends StatelessWidget {
-  const _IconRow();
+  const _IconRow({this.compact = false});
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final a = watchAnalysis(context);
     final p = PlyPalette.of(context);
     return Container(
-      decoration: BoxDecoration(
-        color: p.panelHigh,
-        borderRadius: BorderRadius.circular(8),
-      ),
+      decoration: compact
+          ? null
+          : BoxDecoration(
+              color: p.panelHigh,
+              borderRadius: BorderRadius.circular(8),
+            ),
       child: Row(
+        mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           IconButton(
@@ -491,11 +583,8 @@ class _IconRow extends StatelessWidget {
             icon: const Icon(Icons.share),
           ),
           IconButton(
-            tooltip: a.savedId == null ? 'Save to Games' : 'Save changes',
-            onPressed: () async {
-              await a.save();
-              if (context.mounted) snack(context, 'Saved to Games');
-            },
+            tooltip: a.savedId == null ? 'Save to History' : 'Save changes',
+            onPressed: () => saveToHistory(context),
             icon: Badge(
               isLabelVisible: a.dirty && a.savedId != null,
               smallSize: 7,
@@ -546,15 +635,18 @@ class _MoreMenu extends StatelessWidget {
             a.newGame();
         }
       },
-      itemBuilder: (_) => const [
-        PopupMenuItem(value: 'file', child: Text('Open PGN file')),
-        PopupMenuItem(value: 'details', child: Text('Edit game details')),
-        PopupMenuItem(value: 'copy', child: Text('Save as new game')),
-        PopupMenuItem(
-          value: 'revisit',
-          child: Text('Revisit this position later'),
-        ),
-        PopupMenuItem(value: 'new', child: Text('New game')),
+      itemBuilder: (_) => [
+        const PopupMenuItem(value: 'file', child: Text('Open PGN file')),
+        // These write to local history, so they only appear when it is on.
+        if (a.settings.saveHistory) ...const [
+          PopupMenuItem(value: 'details', child: Text('Edit game details')),
+          PopupMenuItem(value: 'copy', child: Text('Save as new game')),
+          PopupMenuItem(
+            value: 'revisit',
+            child: Text('Revisit this position later'),
+          ),
+        ],
+        const PopupMenuItem(value: 'new', child: Text('New game')),
       ],
     );
   }
@@ -627,7 +719,7 @@ class _AnalyseButton extends StatelessWidget {
             ),
           ),
           if (!s.settings.hideClassifications)
-            Row(
+            Wrap(
               children: [
                 for (final c in [
                   MoveClass.inaccuracy,
@@ -1047,16 +1139,17 @@ class _MoveCard extends StatelessWidget {
                   icon: const Icon(Icons.lightbulb_outline, size: 18),
                   label: const Text('Show best move'),
                 ),
-                TextButton.icon(
-                  onPressed: () => addToRevisit(
-                    context,
-                    a.game.positionAt(m.ply).fen,
-                    gameId: a.savedId,
-                    ply: m.ply,
+                if (a.settings.saveHistory)
+                  TextButton.icon(
+                    onPressed: () => addToRevisit(
+                      context,
+                      a.game.positionAt(m.ply).fen,
+                      gameId: a.savedId,
+                      ply: m.ply,
+                    ),
+                    icon: const Icon(Icons.push_pin_outlined, size: 18),
+                    label: const Text('Revisit'),
                   ),
-                  icon: const Icon(Icons.push_pin_outlined, size: 18),
-                  label: const Text('Revisit'),
-                ),
               ],
             ),
         ],

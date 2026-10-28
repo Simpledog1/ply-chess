@@ -19,11 +19,16 @@ class SavedGame {
     required this.addedAt,
     this.myColor,
     this.review,
+    this.profile,
   });
 
   final String id;
   final String pgn;
   final DateTime addedAt;
+
+  /// Profile key (site + username) the game was loaded for; null for games
+  /// imported from PGN/FEN.
+  final String? profile;
 
   /// Which side the user played, when known. Insights only use these games.
   final Side? myColor;
@@ -87,6 +92,7 @@ class SavedGame {
     addedAt: addedAt,
     myColor: clearMyColor ? null : (myColor ?? this.myColor),
     review: clearReview ? null : (review ?? this.review),
+    profile: profile,
   );
 
   Map<String, dynamic> toJson() => {
@@ -95,12 +101,14 @@ class SavedGame {
     'addedAt': addedAt.toIso8601String(),
     if (myColor != null) 'myColor': myColor!.name,
     if (review != null) 'review': review!.toJson(),
+    if (profile != null) 'profile': profile,
   };
 
   factory SavedGame.fromJson(Map<String, dynamic> j) => SavedGame(
     id: j['id'] as String,
     pgn: j['pgn'] as String,
     addedAt: DateTime.parse(j['addedAt'] as String),
+    profile: j['profile'] as String?,
     myColor: switch (j['myColor']) {
       'white' => Side.white,
       'black' => Side.black,
@@ -233,6 +241,36 @@ class GameStore extends ChangeNotifier {
     _games.removeWhere((g) => g.id == id);
     notifyListeners();
     await _save();
+  }
+
+  /// Removes every saved game of a profile, plus positions pinned from them.
+  Future<int> deleteProfile(String key) async {
+    final ids = {
+      for (final g in _games)
+        if (g.profile == key) g.id,
+    };
+    _games.removeWhere((g) => ids.contains(g.id));
+    _positions.removeWhere((p) => ids.contains(p.gameId));
+    notifyListeners();
+    await _save();
+    return ids.length;
+  }
+
+  /// Removes all saved games and positions.
+  Future<void> deleteAll() async {
+    _games.clear();
+    _positions.clear();
+    notifyListeners();
+    await _save();
+  }
+
+  /// Saved games by profile key (null = imported from PGN/FEN).
+  Map<String?, int> countsByProfile() {
+    final out = <String?, int>{};
+    for (final g in _games) {
+      out[g.profile] = (out[g.profile] ?? 0) + 1;
+    }
+    return out;
   }
 
   Future<void> addPosition(SavedPosition p) async {

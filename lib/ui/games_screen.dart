@@ -2,6 +2,7 @@ import 'package:dartchess/dartchess.dart' show Piece, Role, Side;
 import 'package:flutter/material.dart';
 
 import '../analysis/review.dart';
+import '../online/online_games.dart';
 import '../storage/game_store.dart';
 import 'board/chess_board.dart';
 import 'import_export.dart';
@@ -20,10 +21,14 @@ class _GamesScreenState extends State<GamesScreen> {
   String? _speed;
   String _query = '';
 
+  /// Profile filter: null = all, '' = imported games, else a profile key.
+  String? _profile;
+
   bool _matches(SavedGame g) {
     if (_results.isNotEmpty && !_results.contains(g.myResult)) return false;
     if (_color != null && g.myColor != _color) return false;
     if (_speed != null && g.speed != _speed) return false;
+    if (_profile != null && (g.profile ?? '') != _profile) return false;
     if (_query.isNotEmpty) {
       final q = _query.toLowerCase();
       final hay = [
@@ -55,18 +60,30 @@ class _GamesScreenState extends State<GamesScreen> {
               ..sort();
         final theme = Theme.of(context);
         return Scaffold(
-          appBar: AppBar(title: const Text('Games')),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => showImportSheet(context, saveSingle: true),
-            icon: const Icon(Icons.add),
-            label: const Text('Import'),
-          ),
+          appBar: AppBar(title: const Text('History')),
+          floatingActionButton: s.settings.saveHistory
+              ? FloatingActionButton.extended(
+                  onPressed: () => showImportSheet(context, saveSingle: true),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Import'),
+                )
+              : null,
           body: all.isEmpty
-              ? _Empty(
-                  onImport: () => showImportSheet(context, saveSingle: true),
+              ? Column(
+                  children: [
+                    const HistoryStatus(),
+                    Expanded(
+                      child: _Empty(
+                        history: s.settings.saveHistory,
+                        onImport: () =>
+                            showImportSheet(context, saveSingle: true),
+                      ),
+                    ),
+                  ],
                 )
               : Column(
                   children: [
+                    const HistoryStatus(),
                     if (s.store.loadError != null)
                       MaterialBanner(
                         content: Text(s.store.loadError!),
@@ -118,6 +135,17 @@ class _GamesScreenState extends State<GamesScreen> {
                                     setState(() => _color = v ? c : null),
                               ),
                             ),
+                          for (final key in s.store.countsByProfile().keys)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: FilterChip(
+                                label: Text(profileLabel(key)),
+                                selected: _profile == (key ?? ''),
+                                onSelected: (v) => setState(
+                                  () => _profile = v ? (key ?? '') : null,
+                                ),
+                              ),
+                            ),
                           for (final sp in speeds)
                             Padding(
                               padding: const EdgeInsets.only(right: 6),
@@ -163,8 +191,9 @@ class _GamesScreenState extends State<GamesScreen> {
 }
 
 class _Empty extends StatelessWidget {
-  const _Empty({required this.onImport});
+  const _Empty({required this.onImport, required this.history});
   final VoidCallback onImport;
+  final bool history;
 
   @override
   Widget build(BuildContext context) {
@@ -186,18 +215,24 @@ class _Empty extends StatelessWidget {
             Text('No saved games yet', style: theme.textTheme.titleMedium),
             const SizedBox(height: 6),
             Text(
-              'Import a PGN file or paste a game. Reviewed games feed your Insights.',
+              history
+                  ? 'Games you analyse are saved here automatically. You can '
+                        'also import PGN files.'
+                  : 'Local history is off, so nothing is kept after Ply '
+                        'closes. Turn it on to keep reviewed games and build '
+                        'Insights over time.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: onImport,
-              icon: const Icon(Icons.add),
-              label: const Text('Import games'),
-            ),
+            if (history)
+              FilledButton.icon(
+                onPressed: onImport,
+                icon: const Icon(Icons.add),
+                label: const Text('Import games'),
+              ),
           ],
         ),
       ),
@@ -451,6 +486,55 @@ Future<void> editGameDetails(BuildContext context, SavedGame g) async {
       from: updated,
       atPly: a.ply,
       orientation: a.orientation,
+    );
+  }
+}
+
+/// "Chess.com · magnus" for a profile key, "Imported" for null.
+String profileLabel(String? key) {
+  if (key == null || key.isEmpty) return 'Imported';
+  final i = key.indexOf(':');
+  final site = ChessSite.values.where((s) => s.name == key.substring(0, i));
+  return '${site.firstOrNull?.label ?? key.substring(0, i)} · ${key.substring(i + 1)}';
+}
+
+/// Says plainly whether games are being saved on this PC.
+class HistoryStatus extends StatelessWidget {
+  const HistoryStatus({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Services.of(context);
+    final theme = Theme.of(context);
+    final on = s.settings.saveHistory;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: (on ? theme.colorScheme.primary : theme.colorScheme.outline)
+            .withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(on ? Icons.save_outlined : Icons.memory, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              on
+                  ? 'Local history is ON: analysed games are saved on this PC.'
+                  : 'Local history is OFF: games and analysis are kept in '
+                        'memory only.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          TextButton(
+            onPressed: () => s.settings.update((x) => x.saveHistory = !on),
+            child: Text(on ? 'Turn off' : 'Turn on'),
+          ),
+        ],
+      ),
     );
   }
 }

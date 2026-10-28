@@ -10,6 +10,7 @@ import '../analysis/review_runner.dart';
 import '../chess/chess_game.dart';
 import '../engine/engine_service.dart';
 import '../engine/uci.dart';
+import '../online/online_games.dart';
 import '../storage/game_store.dart';
 import '../storage/settings.dart';
 
@@ -48,7 +49,11 @@ class AnalysisController extends ChangeNotifier {
   Timer? _debounce;
 
   bool reviewing = false;
+  int reviewingDepth = 0;
   bool _cancelReview = false;
+
+  /// Profile key of the site account the game was loaded for, if any.
+  String? gameProfile;
 
   /// Opening book, loaded in the background at startup.
   OpeningBook? get book => bookLoaded.value;
@@ -177,12 +182,19 @@ class AnalysisController extends ChangeNotifier {
     _scheduleLive();
   }
 
-  void load(ChessGame g, {SavedGame? from, int atPly = 0, Side? orientation}) {
+  void load(
+    ChessGame g, {
+    SavedGame? from,
+    int atPly = 0,
+    Side? orientation,
+    String? profile,
+  }) {
     cancelReview();
     _stopAutoplay();
     game = g;
     ply = atPly.clamp(0, g.length);
     savedId = from?.id;
+    gameProfile = profile ?? from?.profile;
     dirty = false;
     review = from?.review;
     this.orientation = orientation ?? from?.myColor ?? Side.white;
@@ -195,6 +207,33 @@ class AnalysisController extends ChangeNotifier {
 
   void loadSaved(SavedGame s, {int atPly = 0}) =>
       load(s.game, from: s, atPly: atPly);
+
+  /// Opens a game fetched for [profile]. A copy kept in local history (same
+  /// game URL) is reopened with its saved analysis.
+  void openOnline(OnlineGame g, {required String profile}) {
+    final stored = _findStored(g.game);
+    if (stored != null) return loadSaved(stored);
+    load(
+      g.game,
+      profile: profile,
+      orientation: GameStore.detectColor(g.game, settings.myNames),
+    );
+  }
+
+  /// The saved copy of [g], matched by its game URL.
+  SavedGame? _findStored(ChessGame g) {
+    final link = _link(g);
+    if (link == null) return null;
+    for (final s in store.games) {
+      if (_link(s.game) == link) return s;
+    }
+    return null;
+  }
+
+  static String? _link(ChessGame g) {
+    final l = g.headers['Link'] ?? g.headers['Site'];
+    return l != null && l.startsWith('http') ? l : null;
+  }
 
   void newGame() => load(ChessGame.standard());
 
@@ -232,15 +271,17 @@ class AnalysisController extends ChangeNotifier {
 
   // --- saving ----------------------------------------------------------------
 
+  /// Writes the game (and its analysis) to local history.
   Future<SavedGame> save({bool asNew = false}) async {
-    final existing = asNew ? null : saved;
+    final existing = asNew ? null : saved ?? _findStored(game);
     final s = existing == null
         ? SavedGame(
             id: newId(),
             pgn: game.toPgn(),
             addedAt: DateTime.now(),
-            myColor: GameStore.detectColor(game, settings.usernames),
+            myColor: GameStore.detectColor(game, settings.myNames),
             review: review,
+            profile: gameProfile,
           )
         : existing.copyWith(
             pgn: game.toPgn(),
@@ -346,23 +387,26 @@ class AnalysisController extends ChangeNotifier {
 
   // --- review ----------------------------------------------------------------
 
-  /// Analyses the whole game. Saves the game first so results persist.
-  Future<void> startReview() async {
+  /// Analyses the whole game at the review depth (or [depth] for a deeper
+  /// review). Results stay in memory; with local history on, the game and
+  /// its analysis are also saved.
+  Future<void> startReview({int? depth}) async {
     if (reviewing || game.length == 0) return;
     reviewing = true;
+    reviewingDepth = depth ?? settings.reviewDepth;
     _cancelReview = false;
     _liveToken++;
     engine.stop();
     engineError = null;
     notifyListeners();
     try {
-      await save();
+      if (settings.saveHistory) await save();
       final e = await engine.engine;
       final reviewedGame = game;
       final result = await runReview(
         engine: e,
         game: reviewedGame,
-        depth: settings.reviewDepth,
+        depth: reviewingDepth,
         resume: review,
         isCancelled: () => _cancelReview || !identical(game, reviewedGame),
         onProgress: (partial) {
@@ -376,7 +420,9 @@ class AnalysisController extends ChangeNotifier {
         review = result;
         _refreshReview();
         final s = saved;
-        if (s != null) await store.upsert(s.copyWith(review: result));
+        if (s != null && settings.saveHistory) {
+          await store.upsert(s.copyWith(review: result));
+        }
       }
     } on EngineException catch (e) {
       engineError = e.message;

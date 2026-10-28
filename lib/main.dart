@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,11 +8,13 @@ import 'package:path_provider/path_provider.dart';
 
 import 'analysis/openings.dart';
 import 'engine/engine_service.dart';
+import 'online/games_browser.dart';
 import 'storage/game_store.dart';
 import 'storage/settings.dart';
 import 'ui/analysis_controller.dart';
 import 'ui/analyze_screen.dart';
 import 'ui/board/chess_board.dart';
+import 'ui/desktop_top_bar.dart';
 import 'ui/games_screen.dart';
 import 'ui/insights_screen.dart';
 import 'ui/services.dart';
@@ -20,7 +23,11 @@ import 'ui/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final dir = await getApplicationDocumentsDirectory();
+  // Windows: %APPDATA%\Simpledog1\Ply (never the install folder).
+  // Android keeps the documents folder used by earlier versions.
+  final dir = Platform.isAndroid
+      ? await getApplicationDocumentsDirectory()
+      : await getApplicationSupportDirectory();
   final settings = Settings(dir);
   await settings.load();
   final store = GameStore(dir);
@@ -44,6 +51,7 @@ Future<void> main() async {
       settings: settings,
       engine: engine,
       analysis: analysis,
+      browser: GamesBrowser(settings: settings),
       tab: ValueNotifier(0),
       child: const PlyApp(),
     ),
@@ -120,7 +128,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   ];
   static const _dest = [
     (Icons.grid_view_outlined, Icons.grid_view_rounded, 'Analyze'),
-    (Icons.folder_outlined, Icons.folder, 'Games'),
+    (Icons.history, Icons.history, 'History'),
     (Icons.insights_outlined, Icons.insights, 'Insights'),
     (Icons.tune_outlined, Icons.tune, 'Settings'),
   ];
@@ -150,7 +158,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     return ValueListenableBuilder<int>(
       valueListenable: tab,
       builder: (context, i, _) {
-        final wide = MediaQuery.sizeOf(context).width >= 840;
+        final desktop = MediaQuery.sizeOf(context).width >= desktopWidth;
         final body = IndexedStack(index: i, children: _pages);
         return PopScope(
           canPop: i == 0,
@@ -158,28 +166,15 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             if (!didPop) tab.value = 0;
           },
           child: Scaffold(
-            body: wide
-                ? Row(
+            body: desktop
+                ? Column(
                     children: [
-                      NavigationRail(
-                        selectedIndex: i,
-                        onDestinationSelected: (v) => tab.value = v,
-                        labelType: NavigationRailLabelType.all,
-                        destinations: [
-                          for (final d in _dest)
-                            NavigationRailDestination(
-                              icon: Icon(d.$1),
-                              selectedIcon: Icon(d.$2),
-                              label: Text(d.$3),
-                            ),
-                        ],
-                      ),
-                      const VerticalDivider(width: 1),
+                      DesktopTopBar(sections: [for (final d in _dest) d.$3]),
                       Expanded(child: body),
                     ],
                   )
                 : body,
-            bottomNavigationBar: wide
+            bottomNavigationBar: desktop
                 ? null
                 : NavigationBar(
                     selectedIndex: i,

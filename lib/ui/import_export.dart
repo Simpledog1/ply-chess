@@ -160,12 +160,21 @@ Future<void> importPgnText(
     await _showErrors(context, 'Nothing imported', r.errors);
     return;
   }
-  if (r.games.length == 1 && !saveSingle) {
+  // Without local history nothing is written to disk: open the first game.
+  if ((r.games.length == 1 && !saveSingle) || !s.settings.saveHistory) {
+    final g = r.games.first;
     s.analysis.load(
-      r.games.single,
-      orientation: GameStore.detectColor(r.games.single, s.settings.usernames),
+      g,
+      orientation: GameStore.detectColor(g, s.settings.myNames),
     );
     s.tab.value = 0;
+    if (r.games.length > 1) {
+      snack(
+        context,
+        'Opened game 1 of ${r.games.length}. Turn on local history in '
+        'Settings to keep all of them.',
+      );
+    }
   } else {
     final now = DateTime.now();
     final saved = [
@@ -174,14 +183,14 @@ Future<void> importPgnText(
           id: newId(),
           pgn: g.toPgn(),
           addedAt: now.add(Duration(microseconds: i)),
-          myColor: GameStore.detectColor(g, s.settings.usernames),
+          myColor: GameStore.detectColor(g, s.settings.myNames),
         ),
     ];
     await s.store.addAll(saved);
     if (!context.mounted) return;
     snack(
       context,
-      'Saved ${saved.length} game${saved.length == 1 ? '' : 's'} to Games',
+      'Saved ${saved.length} game${saved.length == 1 ? '' : 's'} to History',
     );
     if (!saveSingle) s.open(saved.first);
   }

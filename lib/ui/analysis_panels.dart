@@ -1,12 +1,10 @@
-import 'package:dartchess/dartchess.dart' show Side;
 import 'package:flutter/material.dart';
 
 import '../analysis/review.dart';
 import '../chess/chess_game.dart';
-import '../online/online_games.dart';
-import '../storage/game_store.dart';
 import '../storage/settings.dart';
 import 'import_export.dart';
+import 'online_game_list.dart';
 import 'services.dart';
 import 'theme.dart';
 
@@ -40,7 +38,8 @@ class _LoadCardState extends State<LoadCard> {
     final source = s.settings.loadSource;
     if (_shownSource != source) {
       _shownSource = source;
-      _text.text = _online ? s.settings.onlineUsername : '';
+      final pr = s.settings.profile;
+      _text.text = pr != null && pr.site == source.site ? pr.username : '';
     }
     final hint = switch (source) {
       LoadSource.pgn => 'Paste PGN here',
@@ -180,71 +179,22 @@ class _LoadCardState extends State<LoadCard> {
 
   Future<void> _search(String user) async {
     final s = Services.of(context);
-    final lichess = s.settings.loadSource == LoadSource.lichess;
+    final site = s.settings.loadSource.site!;
     setState(() => _busy = true);
-    try {
-      await s.settings.update((x) => x.onlineUsername = user);
-      final api = OnlineGames();
-      final pgns = lichess ? await api.lichess(user) : await api.chessCom(user);
-      if (!mounted) return;
-      final games = <ChessGame>[];
-      for (final p in pgns) {
-        try {
-          games.add(ChessGame.fromPgn(p));
-        } on FormatException {
-          // Skip the odd game the parser cannot read.
-        }
-      }
-      if (games.isEmpty) {
-        snack(context, 'No standard games found for $user');
-        return;
-      }
-      await showOnlineGames(context, user: user, games: games);
-    } on OnlineException catch (e) {
-      if (mounted) snack(context, e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    await s.browser.open(site, user);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    final b = s.browser;
+    if (b.error != null && (b.feed?.games.isEmpty ?? true)) {
+      snack(context, b.error!);
+      return;
     }
+    await showOnlineGames(context);
   }
 }
 
-/// Picker for games fetched from Chess.com / Lichess.
-Future<void> showOnlineGames(
-  BuildContext context, {
-  required String user,
-  required List<ChessGame> games,
-}) {
-  final s = Services.of(context);
-  final me = user.toLowerCase();
-
-  Side? colorOf(ChessGame g) => GameStore.detectColor(g, [me]);
-
-  String? linkOf(ChessGame g) {
-    final l = g.headers['Link'] ?? g.headers['Site'];
-    return l != null && l.startsWith('http') ? l : null;
-  }
-
-  Future<SavedGame> save(ChessGame g) async {
-    final link = linkOf(g);
-    for (final existing in s.store.games) {
-      if (link != null && linkOf(existing.game) == link) return existing;
-    }
-    final saved = SavedGame(
-      id: newId(),
-      pgn: g.toPgn(),
-      addedAt: DateTime.now(),
-      myColor: colorOf(g),
-    );
-    await s.store.upsert(saved);
-    return saved;
-  }
-
-  Future<void> rememberName() async {
-    if (!s.settings.usernames.map((u) => u.toLowerCase()).contains(me)) {
-      await s.settings.update((x) => x.usernames = [...x.usernames, user]);
-    }
-  }
-
+/// Bottom sheet with the selected profile's recent games.
+Future<void> showOnlineGames(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -253,83 +203,9 @@ Future<void> showOnlineGames(
       expand: false,
       initialChildSize: 0.7,
       maxChildSize: 0.95,
-      builder: (ctx, scroll) => Column(
-        children: [
-          ListTile(
-            title: Text('Recent games of $user'),
-            subtitle: Text('${games.length} games · tap one to analyse it'),
-            trailing: TextButton(
-              onPressed: () async {
-                await rememberName();
-                for (final g in games) {
-                  await save(g);
-                }
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) {
-                  snack(context, 'Saved ${games.length} games to Games');
-                }
-              },
-              child: const Text('Save all'),
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              controller: scroll,
-              itemCount: games.length,
-              itemBuilder: (ctx, i) {
-                final g = games[i];
-                final h = g.headers;
-                String who(String side) {
-                  final elo = h['${side}Elo'];
-                  return '${h[side] ?? '?'}${elo == null ? '' : ' ($elo)'}';
-                }
-
-                final mine = colorOf(g);
-                final r = g.result;
-                final res = mine == null || r == '*'
-                    ? '–'
-                    : r == '1/2-1/2'
-                    ? 'D'
-                    : (r == '1-0') == (mine == Side.white)
-                    ? 'W'
-                    : 'L';
-                final color = switch (res) {
-                  'W' => classColor(MoveClass.best),
-                  'L' => classColor(MoveClass.blunder),
-                  _ => Theme.of(ctx).colorScheme.onSurfaceVariant,
-                };
-                final date = h['UTCDate'] ?? h['Date'] ?? '';
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: color.withValues(alpha: 0.2),
-                    child: Text(
-                      res,
-                      style: TextStyle(
-                        color: color,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  title: Text('${who('White')} vs ${who('Black')}'),
-                  subtitle: Text(
-                    [
-                      date.replaceAll('.', '-'),
-                      ?h['TimeControl'],
-                      r,
-                      '${(g.length + 1) ~/ 2} moves',
-                    ].join(' · '),
-                  ),
-                  onTap: () async {
-                    await rememberName();
-                    final saved = await save(g);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    s.open(saved);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+      builder: (ctx, scroll) => OnlineGameList(
+        controller: scroll,
+        onOpened: () => Navigator.pop(ctx),
       ),
     ),
   );

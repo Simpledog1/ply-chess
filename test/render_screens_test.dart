@@ -14,6 +14,7 @@ import 'package:ply/analysis/openings.dart';
 import 'package:ply/analysis/review_runner.dart';
 import 'package:ply/chess/chess_game.dart';
 import 'package:ply/engine/engine_service.dart';
+import 'package:ply/online/games_browser.dart';
 import 'package:ply/engine/uci.dart';
 import 'package:ply/main.dart';
 import 'package:ply/storage/game_store.dart';
@@ -124,6 +125,7 @@ void main() {
           store: store,
           settings: settings,
         ),
+        browser: GamesBrowser(settings: settings),
         tab: ValueNotifier(0),
         child: RepaintBoundary(key: key, child: const PlyApp()),
       );

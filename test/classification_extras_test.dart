@@ -170,7 +170,7 @@ void main() {
     const text =
         '[Event "A"]\r\n[White "x"]\r\n\r\n1. e4 e5 1-0\r\n\r\n\r\n'
         '[Event "B"]\n[White "y"]\n\n1. d4 d5 0-1\n';
-    final games = OnlineGames.splitPgn(text);
+    final games = splitPgn(text);
     expect(games.length, 2);
     expect(ChessGame.fromPgn(games[1]).headers['White'], 'y');
   });
