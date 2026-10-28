@@ -87,6 +87,24 @@ class InsightsScreen extends StatelessWidget {
                   ),
                 ]),
                 const SizedBox(height: 12),
+                _Section('Learning points across games', [
+                  Text(
+                    'From ${ins.reviewedGames} reviewed game(s). Marked '
+                    'recurring only when seen in $minGamesForPattern+ '
+                    'games out of $minGamesForInsights+ reviewed.',
+                    style: muted,
+                  ),
+                  if (ins.lessons.isEmpty) Text('None yet.', style: muted),
+                  for (final e
+                      in (ins.lessons.entries.toList()
+                        ..sort((a, b) => b.value.$2.compareTo(a.value.$2))))
+                    _Row(
+                      e.key.label,
+                      ins.isRecurring(e.key) ? 'Recurring' : '',
+                      '${e.value.$1}× in ${e.value.$2} game(s)',
+                    ),
+                ]),
+                const SizedBox(height: 12),
                 _Section('Possible weaknesses', [
                   Text(
                     ins.reviewedGames < minGamesForInsights

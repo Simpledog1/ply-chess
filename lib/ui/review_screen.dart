@@ -1,6 +1,7 @@
 import 'package:dartchess/dartchess.dart';
 import 'package:flutter/material.dart';
 
+import '../analysis/lessons.dart';
 import '../analysis/review.dart';
 import 'services.dart';
 import 'theme.dart';
@@ -132,6 +133,23 @@ class ReviewScreen extends StatelessWidget {
                   ),
                 const SizedBox(height: 12),
               ],
+              Text('Learning points', style: theme.textTheme.titleSmall),
+              Text(
+                'From this game only; tap one to see the position.',
+                style: theme.textTheme.bodySmall,
+              ),
+              for (final (kind, items) in groupLessons(
+                findLessons(a.game, r, moves),
+              ))
+                for (final l in items)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(kind.label),
+                    subtitle: Text(l.text),
+                    onTap: () => jump(l.ply + 1),
+                  ),
+              const SizedBox(height: 12),
               Text('Every move', style: theme.textTheme.titleSmall),
               for (final m in moves)
                 if (m != null)

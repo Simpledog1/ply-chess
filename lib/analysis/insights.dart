@@ -1,6 +1,7 @@
 import 'package:dartchess/dartchess.dart';
 
 import '../storage/game_store.dart';
+import 'lessons.dart';
 import 'review.dart';
 
 /// Evidence needed before Ply calls something a pattern.
@@ -81,6 +82,7 @@ class Insights {
     required this.missedTactics,
     required this.openingProblems,
     required this.results,
+    required this.lessons,
   });
 
   /// Games with a complete review and a known colour for the user.
@@ -95,6 +97,17 @@ class Insights {
   final List<MyMove> missedTactics;
   final List<OpeningProblem> openingProblems;
   final Map<String, int> results;
+
+  /// Learning points across reviewed games: kind -> (occurrences, games).
+  final Map<LessonKind, (int, int)> lessons;
+
+  /// A learning point is called recurring only with enough evidence.
+  bool isRecurring(LessonKind k) {
+    final v = lessons[k];
+    return v != null &&
+        reviewedGames >= minGamesForInsights &&
+        v.$2 >= minGamesForPattern;
+  }
 
   double? get averageAccuracy => _mean(trend.map((t) => t.$2));
 
@@ -128,6 +141,8 @@ class Insights {
     final moves = <MyMove>[];
     final trend = <(DateTime, double)>[];
     final results = <String, int>{'win': 0, 'loss': 0, 'draw': 0};
+    final lessonCounts = <LessonKind, (int, int)>{};
+    final lessonGames = <LessonKind, Set<String>>{};
     for (final g in used) {
       final rs = reviewMoves(
         g.game,
@@ -142,6 +157,11 @@ class Insights {
             MyMove(g, r),
       ];
       moves.addAll(mine);
+      for (final l in findLessons(g.game, g.review!, rs, side: g.myColor)) {
+        final (n, games) = lessonCounts[l.kind] ?? (0, 0);
+        final seen = lessonGames.putIfAbsent(l.kind, () => <String>{});
+        lessonCounts[l.kind] = (n + 1, seen.add(g.id) ? games + 1 : games);
+      }
       final acc = summarize(rs, g.myColor!).accuracy;
       if (acc != null) trend.add((g.date, acc));
       final res = g.myResult;
@@ -280,6 +300,7 @@ class Insights {
       missedTactics: missed,
       openingProblems: openingProblems,
       results: results,
+      lessons: lessonCounts,
     );
   }
 }
