@@ -22,7 +22,18 @@ class ProcessTransport implements EngineTransport {
   final Stream<String> lines;
 
   static Future<ProcessTransport> start(String path) async =>
-      ProcessTransport._(await Process.start(path, const []));
+      ProcessTransport._(
+        await Process.start(
+          path,
+          const [],
+          // On Windows a console program started from a GUI app would get its
+          // own console window; a detached process with pipes gets none.
+          // Stockfish still exits when Ply closes (its stdin reaches EOF).
+          mode: Platform.isWindows
+              ? ProcessStartMode.detachedWithStdio
+              : ProcessStartMode.normal,
+        ),
+      );
 
   @override
   void send(String command) {
