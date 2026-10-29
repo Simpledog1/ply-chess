@@ -32,28 +32,40 @@ Future<GameReview> runReview({
   for (var i = 0; i <= game.length; i++) {
     if (isCancelled?.call() ?? false) break;
     if (positions[i] != null) continue;
-    final pos = game.positionAt(i);
-    final terminal = terminalEval(pos);
-    if (terminal != null) {
-      positions[i] = PositionAnalysis(eval: terminal, depth: depth);
-    } else {
-      final r = await engine.search(
-        fen: game.initialFen,
-        moves: game.ucisBefore(i),
-        turn: pos.turn,
-        depth: depth,
-        multiPv: multiPv,
-      );
-      if (!r.complete) break; // stopped: keep only fully searched positions
-      positions[i] = PositionAnalysis(
-        eval: r.best!.eval,
-        depth: r.depth,
-        bestMove: r.bestMove,
-        pv: r.best!.pv.take(10).toList(),
-        second: r.lines.length > 1 ? r.lines[1].eval : null,
-      );
-    }
+    final r = await analysePosition(engine, game, i, depth, multiPv: multiPv);
+    if (r == null) break; // stopped: keep only fully searched positions
+    positions[i] = r;
     onProgress?.call(snapshot());
   }
   return snapshot();
+}
+
+/// Analyses the position after [i] plies of [game] the way a review does
+/// (fixed [depth], two lines). Finished positions are scored by the rules.
+/// Returns null when the search was stopped before it completed.
+Future<PositionAnalysis?> analysePosition(
+  UciEngine engine,
+  ChessGame game,
+  int i,
+  int depth, {
+  int multiPv = 2,
+}) async {
+  final pos = game.positionAt(i);
+  final terminal = terminalEval(pos);
+  if (terminal != null) return PositionAnalysis(eval: terminal, depth: depth);
+  final r = await engine.search(
+    fen: game.initialFen,
+    moves: game.ucisBefore(i),
+    turn: pos.turn,
+    depth: depth,
+    multiPv: multiPv,
+  );
+  if (!r.complete) return null;
+  return PositionAnalysis(
+    eval: r.best!.eval,
+    depth: r.depth,
+    bestMove: r.bestMove,
+    pv: r.best!.pv.take(10).toList(),
+    second: r.lines.length > 1 ? r.lines[1].eval : null,
+  );
 }

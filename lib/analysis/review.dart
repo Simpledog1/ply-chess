@@ -376,88 +376,104 @@ List<MoveReview?> reviewMoves(
     inBook = inBook && book!.contains(game.plies[i].after);
     final a = data.positions[i];
     final b = data.positions[i + 1];
-    if (a == null || b == null) {
-      out.add(null);
-      continue;
-    }
-    final pos = game.positionAt(i);
-    final mover = pos.turn;
-    final ply = game.plies[i];
-    final wb = a.eval.winPercentFor(mover);
-    final wa = b.eval.winPercentFor(mover);
-    final forced = pos.legalMoves.values.fold(0, (n, s) => n + s.size) == 1;
-    final isBest = a.bestMove != null && a.bestMove == ply.uci;
-    final theory = inBook && !forced;
-    final loss = (forced || isBest || theory) ? 0.0 : math.max(0.0, wb - wa);
-    final secondWin = a.second?.winPercentFor(mover);
-    final critical =
-        isBest &&
-        options.critical &&
-        secondWin != null &&
-        wb - secondWin >= ClassOptions.criticalGap;
-    final brilliant =
-        isBest &&
-        options.brilliant &&
-        wa >= 45 &&
-        wb <= 95 &&
-        isSacrifice(pos, ply.uci);
-    final cls = forced
-        ? MoveClass.forced
-        : theory
-        ? MoveClass.theory
-        : brilliant
-        ? MoveClass.brilliant
-        : critical
-        ? MoveClass.critical
-        : isBest
-        ? MoveClass.best
-        : t.classify(loss);
-
-    final forcing = a.bestMove != null && _isForcing(pos, a.bestMove!);
-    final tags = <MoveTag>{};
-    final moverMatesBefore =
-        a.eval.isMate && a.eval.whiteMates == (mover == Side.white);
-    final moverMatesAfter =
-        b.eval.isMate && b.eval.whiteMates == (mover == Side.white);
-    final matedBefore = a.eval.isMate && !moverMatesBefore;
-    final matedAfter = b.eval.isMate && !moverMatesAfter;
-    if (!forced && !isBest && !theory) {
-      if (moverMatesBefore && !moverMatesAfter) tags.add(MoveTag.missedMate);
-      if (!matedBefore && matedAfter && b.eval.mateIn! > 0) {
-        tags.add(MoveTag.allowedMate);
-      }
-      if (wb >= 70 && wa <= 55) tags.add(MoveTag.missedWin);
-      if (cls.isSerious && forcing) {
-        tags.add(MoveTag.tacticalMiss);
-      }
-    }
-
-    final bestSans = uciLineToSan(pos, a.pv.isNotEmpty ? a.pv : [?a.bestMove]);
-    final replySans = uciLineToSan(ply.after, b.pv);
     out.add(
-      MoveReview(
-        ply: i,
-        mover: mover,
-        san: ply.san,
-        cls: cls,
-        loss: loss,
-        accuracy: loss == 0 ? 100 : moveAccuracy(wb, wa),
-        before: a.eval,
-        after: b.eval,
-        winBefore: wb,
-        winAfter: wa,
-        phase: phaseOf(pos),
-        tags: tags,
-        bestSan: bestSans.isEmpty ? null : bestSans.first,
-        bestLine: formatLine(pos, bestSans),
-        replyLine: formatLine(ply.after, replySans),
-        depth: a.depth,
-        bestIsForcing: forcing,
-        secondWin: secondWin,
-      ),
+      a == null || b == null
+          ? null
+          : reviewMove(game, i, a, b, t, options: options, inBook: inBook),
     );
   }
   return out;
+}
+
+/// Classifies move [i] of [game] from the analyses of the positions before
+/// ([a]) and after ([b]) it. Both must come from searches of the same depth
+/// so the evaluations are comparable. [inBook]: every position up to and
+/// including the one after this move is in the opening book.
+MoveReview reviewMove(
+  ChessGame game,
+  int i,
+  PositionAnalysis a,
+  PositionAnalysis b,
+  Thresholds t, {
+  ClassOptions options = const ClassOptions(),
+  bool inBook = false,
+}) {
+  final pos = game.positionAt(i);
+  final mover = pos.turn;
+  final ply = game.plies[i];
+  // Evaluations are stored from White's side; comparing the mover's
+  // winning chances puts both perspectives and mate scores on one scale.
+  final wb = a.eval.winPercentFor(mover);
+  final wa = b.eval.winPercentFor(mover);
+  final forced = pos.legalMoves.values.fold(0, (n, s) => n + s.size) == 1;
+  final isBest = a.bestMove != null && a.bestMove == ply.uci;
+  final theory = inBook && !forced;
+  final loss = (forced || isBest || theory) ? 0.0 : math.max(0.0, wb - wa);
+  final secondWin = a.second?.winPercentFor(mover);
+  final critical =
+      isBest &&
+      options.critical &&
+      secondWin != null &&
+      wb - secondWin >= ClassOptions.criticalGap;
+  final brilliant =
+      isBest &&
+      options.brilliant &&
+      wa >= 45 &&
+      wb <= 95 &&
+      isSacrifice(pos, ply.uci);
+  final cls = forced
+      ? MoveClass.forced
+      : theory
+      ? MoveClass.theory
+      : brilliant
+      ? MoveClass.brilliant
+      : critical
+      ? MoveClass.critical
+      : isBest
+      ? MoveClass.best
+      : t.classify(loss);
+
+  final forcing = a.bestMove != null && _isForcing(pos, a.bestMove!);
+  final tags = <MoveTag>{};
+  final moverMatesBefore =
+      a.eval.isMate && a.eval.whiteMates == (mover == Side.white);
+  final moverMatesAfter =
+      b.eval.isMate && b.eval.whiteMates == (mover == Side.white);
+  final matedBefore = a.eval.isMate && !moverMatesBefore;
+  final matedAfter = b.eval.isMate && !moverMatesAfter;
+  if (!forced && !isBest && !theory) {
+    if (moverMatesBefore && !moverMatesAfter) tags.add(MoveTag.missedMate);
+    if (!matedBefore && matedAfter && b.eval.mateIn! > 0) {
+      tags.add(MoveTag.allowedMate);
+    }
+    if (wb >= 70 && wa <= 55) tags.add(MoveTag.missedWin);
+    if (cls.isSerious && forcing) {
+      tags.add(MoveTag.tacticalMiss);
+    }
+  }
+
+  final bestSans = uciLineToSan(pos, a.pv.isNotEmpty ? a.pv : [?a.bestMove]);
+  final replySans = uciLineToSan(ply.after, b.pv);
+  return MoveReview(
+    ply: i,
+    mover: mover,
+    san: ply.san,
+    cls: cls,
+    loss: loss,
+    accuracy: loss == 0 ? 100 : moveAccuracy(wb, wa),
+    before: a.eval,
+    after: b.eval,
+    winBefore: wb,
+    winAfter: wa,
+    phase: phaseOf(pos),
+    tags: tags,
+    bestSan: bestSans.isEmpty ? null : bestSans.first,
+    bestLine: formatLine(pos, bestSans),
+    replyLine: formatLine(ply.after, replySans),
+    depth: a.depth,
+    bestIsForcing: forcing,
+    secondWin: secondWin,
+  );
 }
 
 /// A capture, check or promotion: the kind of move a tactic starts with.

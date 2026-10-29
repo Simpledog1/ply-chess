@@ -9,6 +9,9 @@ import 'package:ply/analysis/review_runner.dart';
 import 'package:ply/chess/chess_game.dart';
 import 'package:ply/engine/engine_service.dart';
 import 'package:ply/engine/uci.dart';
+import 'package:ply/storage/game_store.dart';
+import 'package:ply/storage/settings.dart';
+import 'package:ply/ui/analysis_controller.dart';
 
 void main() {
   final path = Platform.environment['STOCKFISH_PATH'];
@@ -83,4 +86,45 @@ void main() {
     expect(moves[6]!.cls, MoveClass.critical);
     expect(summarize(moves, Side.black).counts[MoveClass.blunder], 1);
   }, skip: skip);
+
+  test(
+    'rates a what-if move in the background without changing the game',
+    () async {
+      final dir = Directory.systemTemp.createTempSync('ply_sf_whatif');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final service = EngineService(
+        connect: () => ProcessTransport.start(path!),
+      );
+      final a = AnalysisController(
+        engine: service,
+        store: GameStore(dir),
+        settings: Settings(dir),
+      );
+      addTearDown(() async {
+        a.dispose();
+        await (await service.engine).dispose();
+      });
+      a.load(ChessGame.fromPgn('1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6'));
+      a.goTo(6);
+      a.userMove(Move.parse('c4f7')!); // 4. Bxf7+?: a bishop for a pawn
+      expect(a.onWhatIf, isTrue);
+      expect(a.checking, isTrue);
+      // A position change while thinking must not leak results.
+      a.goTo(5);
+      a.goTo(7);
+      for (var i = 0; i < 100 && a.lastMoveReview == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      final m = a.lastMoveReview!;
+      expect(m.san, 'Bxf7+');
+      expect(m.mover, Side.white);
+      expect(m.cls.isError, isTrue);
+      expect(m.bestSan, isNotNull);
+      expect(a.game.length, 6);
+      expect(a.review, isNull);
+      a.backToGame();
+      expect(a.position.fen, a.game.last.fen);
+    },
+    skip: skip,
+  );
 }
