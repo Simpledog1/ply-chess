@@ -5,7 +5,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:dartchess/dartchess.dart' show Side;
+import 'package:dartchess/dartchess.dart' show Move, Side;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -22,7 +22,6 @@ import 'package:ply/storage/game_store.dart';
 import 'package:ply/storage/settings.dart';
 import 'package:ply/ui/analysis_controller.dart';
 import 'package:ply/ui/board/chess_board.dart';
-import 'package:ply/ui/review_screen.dart';
 import 'package:ply/ui/services.dart';
 
 const opera = '''
@@ -191,11 +190,6 @@ void main() {
     services.settings.update((s) => s.themeMode = ThemeMode.light);
     await shot('analyze_light');
     services.settings.update((s) => s.themeMode = ThemeMode.dark);
-    final nav = tester.state<NavigatorState>(find.byType(Navigator).first);
-    nav.push(MaterialPageRoute<void>(builder: (_) => const ReviewScreen()));
-    await shot('review');
-    nav.pop();
-    await tester.pump(const Duration(seconds: 1));
     services.tab.value = 1;
     await shot('games');
     services.tab.value = 2;
@@ -209,8 +203,24 @@ void main() {
     services.tab.value = 0;
     services.analysis.goTo(17);
     await shot('desktop_analyze');
-    await tester.tap(find.widgetWithText(Tab, 'Review'));
-    await shot('desktop_review');
+    // A what-if move, checked by Stockfish in the background.
+    services.analysis.goTo(18);
+    services.analysis.userMove(Move.parse('c4b5')!);
+    for (var i = 0; i < 40 && services.analysis.lastMoveReview == null; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 250)),
+      );
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+    await shot('desktop_whatif');
+    services.analysis.backToGame();
+    // Common laptop size.
+    tester.view.physicalSize = const Size(1366, 768);
+    services.analysis.goTo(12);
+    await shot('desktop_1366');
+    tester.view.physicalSize = const Size(1920, 1080);
+    services.analysis.goTo(31);
+    await shot('desktop_1920');
     dir.deleteSync(recursive: true);
   }, skip: skip != null);
 }

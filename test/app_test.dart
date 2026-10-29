@@ -105,6 +105,8 @@ void main() {
     await tester.tap(find.byTooltip('Last move'));
     await tester.pump();
     expect(services.analysis.ply, 2);
+    // Let the background move check (no engine in this test) settle.
+    await tester.pump(const Duration(milliseconds: 300));
   });
 
   testWidgets('empty History and Insights tabs explain what to do', (

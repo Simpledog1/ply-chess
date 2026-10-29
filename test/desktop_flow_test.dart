@@ -5,6 +5,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dartchess/dartchess.dart' show Move;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ply/engine/engine_service.dart';
@@ -144,7 +146,7 @@ void main() {
     expect(analysis.orientation.name, 'black');
 
     // 3. Analyse with the (scripted) engine.
-    await tester.tap(find.text('Analyse'));
+    await tester.tap(find.text('Analyse game'));
     for (
       var i = 0;
       i < 40 && (analysis.reviewing || analysis.review == null);
@@ -155,21 +157,48 @@ void main() {
     expect(analysis.review!.complete, isTrue);
     expect(store.games, isEmpty); // local history is off by default
 
-    // 4. Review tab lists the blunder and a learning point.
-    await tester.tap(find.widgetWithText(Tab, 'Review'));
-    for (var i = 0; i < 10; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    expect(find.text('Key mistakes'), findsOneWidget);
-    expect(find.textContaining('Nf6??'), findsWidgets);
+    // 4. The review sits on the same screen as the board: no tabs.
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byType(Tab), findsNothing);
+    expect(find.text('Game review'), findsOneWidget);
+    expect(find.text('Key moments'), findsOneWidget);
     expect(find.text('Allowed a forced mate'), findsOneWidget);
 
-    // 5. Jump to the mistake on the board.
-    await tester.tap(find.text('Show move').first);
+    // 5. Clicking the blunder in the review shows it on the board, with its
+    // rating in the move card.
+    final blunder = find.text('Blunder');
+    await tester.ensureVisible(blunder);
     await tester.pump();
+    await tester.tap(blunder);
+    await tester.pump(const Duration(milliseconds: 200));
     expect(analysis.ply, 6);
+    expect(find.text('Played in the game'), findsOneWidget);
+    expect(find.text('This allows a forced checkmate.'), findsOneWidget);
 
-    // 6. Closing the app shuts the engine down.
+    // 6. Navigating updates the card for each move.
+    analysis.goTo(5);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(analysis.lastMoveReview!.san, 'Bc4');
+    expect(find.text('This allows a forced checkmate.'), findsNothing);
+
+    // 7. A what-if move is labelled as such, rated in the background, and
+    // the way back leaves the game and its review as they were.
+    analysis.userMove(Move.parse('g7g6')!);
+    await tester.pump();
+    expect(find.text('Your what-if move'), findsOneWidget);
+    expect(find.text('Back to game'), findsOneWidget);
+    for (var i = 0; i < 20 && analysis.lastMoveReview == null; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(analysis.lastMoveReview!.san, 'g6');
+    expect(analysis.game.length, 7);
+    await tester.tap(find.text('Back to game'));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(analysis.variation, isNull);
+    expect(analysis.ply, 5);
+    expect(analysis.review!.matches(analysis.game), isTrue);
+
+    // 8. Closing the app shuts the engine down.
     await tester.runAsync(() => engine.engine.then((e) => e.dispose()));
     expect(engineIo.sent.last, 'quit');
   });

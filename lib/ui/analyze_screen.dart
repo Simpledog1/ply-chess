@@ -4,6 +4,7 @@ import 'package:dartchess/dartchess.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../analysis/eval.dart';
 import '../analysis/lessons.dart';
 import '../analysis/review.dart';
 import '../chess/chess_game.dart';
@@ -17,12 +18,14 @@ import 'board/eval_bar.dart';
 import 'games_screen.dart' show editGameDetails;
 import 'import_export.dart';
 import 'move_text.dart';
+import 'move_words.dart';
 import 'online_game_list.dart';
-import 'review_screen.dart';
+import 'eval_graph.dart';
 import 'services.dart';
 import 'theme.dart';
 
 part 'analyze_desktop.dart';
+part 'analyze_review.dart';
 
 /// Rebuilds every widget below that calls [watchAnalysis] when the analysis,
 /// settings or engine state changes (const widgets included).
@@ -58,7 +61,8 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
   }
 
   /// Keyboard navigation: ←/→ move, Home/End (or ↑/↓) jump, F flip,
-  /// Space play/pause, E engine on/off. Ignored while typing or in dialogs.
+  /// Space play/pause, E engine on/off, Backspace take back a what-if move,
+  /// Esc back to the game. Ignored while typing or in dialogs.
   bool _onKey(KeyEvent e) {
     if (e is! KeyDownEvent && e is! KeyRepeatEvent) return false;
     if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return false;
@@ -79,13 +83,19 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
       case LogicalKeyboardKey.home || LogicalKeyboardKey.arrowUp:
         a.goTo(0);
       case LogicalKeyboardKey.end || LogicalKeyboardKey.arrowDown:
-        a.goTo(a.game.length);
+        a.goTo(a.line.length);
       case LogicalKeyboardKey.keyF when e is KeyDownEvent:
         a.flip();
       case LogicalKeyboardKey.space when e is KeyDownEvent:
-        if (a.game.length > 0) a.toggleAutoplay();
+        if (a.line.length > 0) a.toggleAutoplay();
       case LogicalKeyboardKey.keyE when e is KeyDownEvent:
         if (!a.reviewing) a.toggleEngine();
+      case LogicalKeyboardKey.backspace when a.variation != null:
+        a.undoWhatIf();
+      case LogicalKeyboardKey.escape when a.preview != null:
+        a.closePreview();
+      case LogicalKeyboardKey.escape when a.variation != null:
+        a.backToGame();
       default:
         return false;
     }
@@ -103,7 +113,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
           child: LayoutBuilder(
             builder: (context, c) {
               if (c.maxWidth >= desktopWidth) {
-                return _DesktopLayout(height: c.maxHeight);
+                return _DesktopLayout(width: c.maxWidth);
               }
               final wide = c.maxWidth > 700 && c.maxWidth > c.maxHeight;
               if (wide) {
@@ -203,7 +213,7 @@ class _BoardArea extends StatelessWidget {
         final pos = a.shownPosition;
         final last = a.preview != null
             ? a.previewUcis![a.previewIndex]
-            : (a.ply > 0 ? a.game.plies[a.ply - 1].uci : null);
+            : (a.ply > 0 ? a.line.plies[a.ply - 1].uci : null);
         final lastMove = last == null
             ? null
             : (
@@ -256,8 +266,18 @@ class _BoardArea extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: gap),
-                  SizedBox(
+                  Container(
                     width: size,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      boxShadow: const [
+                        BoxShadow(
+                          blurRadius: 18,
+                          offset: Offset(0, 6),
+                          color: Color(0x40000000),
+                        ),
+                      ],
+                    ),
                     child: ChessBoard(
                       position: pos,
                       orientation: a.orientation,
@@ -265,7 +285,9 @@ class _BoardArea extends StatelessWidget {
                       arrows: arrows,
                       badge: badge,
                       showCoordinates: s.settings.showCoordinates,
-                      onMove: a.preview != null || a.reviewing
+                      // What-if moves never touch the game, so they are
+                      // fine during a review; free-play edits are not.
+                      onMove: a.preview != null || (a.reviewing && a.freePlay)
                           ? null
                           : (m) {
                               final previous = a.userMove(m);
@@ -399,6 +421,7 @@ class _Panel extends StatefulWidget {
 
 class _PanelState extends State<_Panel> {
   final _currentKey = GlobalKey();
+  final _feedbackKey = GlobalKey();
   final _scroll = ScrollController();
   int _lastPly = -1;
 
@@ -415,7 +438,8 @@ class _PanelState extends State<_Panel> {
     if (a.ply != _lastPly) {
       _lastPly = a.ply;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final ctx = _currentKey.currentContext;
+        // Keep the rating of the shown move in view while stepping.
+        final ctx = _feedbackKey.currentContext;
         if (a.ply == 0 && _scroll.hasClients) {
           // Back at the start: show the header and load box again.
           _scroll.animateTo(
@@ -427,7 +451,7 @@ class _PanelState extends State<_Panel> {
           Scrollable.ensureVisible(
             ctx,
             duration: const Duration(milliseconds: 150),
-            alignment: 0.5,
+            alignment: 0.0,
           );
         }
       });
@@ -439,26 +463,42 @@ class _PanelState extends State<_Panel> {
             controller: _scroll,
             padding: const EdgeInsets.all(8),
             children: [
-              const _Header(),
-              const SizedBox(height: 8),
-              const _IconRow(),
+              Container(
+                padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                decoration: p.cardBox(),
+                child: const Row(
+                  children: [
+                    Expanded(child: _GameTitle()),
+                    _IconRow(compact: true),
+                  ],
+                ),
+              ),
               const SizedBox(height: 8),
               const LoadCard(),
               const SizedBox(height: 8),
               const _AnalyseButton(),
               const SizedBox(height: 8),
-              if (a.preview != null)
-                const _PreviewBanner()
-              else
-                const _EnginePanel(),
-              if (a.lastMoveReview != null &&
-                  a.preview == null &&
-                  !a.settings.hideClassifications) ...[
+              if (a.variation != null) ...[
+                const _WhatIfBar(),
                 const SizedBox(height: 8),
-                _MoveCard(a.lastMoveReview!),
               ],
+              KeyedSubtree(key: _feedbackKey, child: const _MoveFeedback()),
+              const SizedBox(height: 8),
+              const _EnginePanel(),
               const SizedBox(height: 8),
               _MoveList(currentKey: _currentKey),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                child: Text(
+                  'Game review',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: _GameReview(),
+              ),
             ],
           ),
         ),
@@ -467,50 +507,9 @@ class _PanelState extends State<_Panel> {
     );
     if (!widget.wide) return content;
     return Container(
-      decoration: BoxDecoration(
-        color: p.panel,
-        borderRadius: BorderRadius.circular(10),
-      ),
+      decoration: p.panelBox(),
       clipBehavior: Clip.antiAlias,
       child: content,
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  const _Header();
-
-  @override
-  Widget build(BuildContext context) {
-    final a = watchAnalysis(context);
-    final title = a.saved?.title;
-    final opening = a.openingName;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: plyBlue,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'Game Analysis',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 26,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (title != null || opening != null)
-            Text(
-              [?title, ?opening].join(' · '),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 12),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -652,6 +651,7 @@ class _MoreMenu extends StatelessWidget {
   }
 }
 
+/// The main action: analyse the game; then its progress and status.
 class _AnalyseButton extends StatelessWidget {
   const _AnalyseButton();
 
@@ -661,21 +661,13 @@ class _AnalyseButton extends StatelessWidget {
     final a = watchAnalysis(context);
     final p = PlyPalette.of(context);
     final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.copyWith(color: p.muted);
     final r = a.review;
-    final style = FilledButton.styleFrom(
-      backgroundColor: p.button,
-      foregroundColor: p.text,
-      minimumSize: const Size.fromHeight(46),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-    );
     if (a.reviewing) {
       final done = r?.analysedCount ?? 0, total = a.game.length + 1;
       return Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
-        decoration: BoxDecoration(
-          color: p.button,
-          borderRadius: BorderRadius.circular(8),
-        ),
+        padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+        decoration: p.cardBox(accent: theme.colorScheme.primary),
         child: Row(
           children: [
             Expanded(
@@ -683,12 +675,17 @@ class _AnalyseButton extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Analysing at depth ${s.settings.reviewDepth} · '
-                    '$done/$total positions',
-                    style: theme.textTheme.bodySmall,
+                    'Analysing the game · $done of $total positions',
+                    style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 6),
                   LinearProgressIndicator(value: done / total),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Stockfish depth ${a.reviewingDepth}. You can keep '
+                    'browsing the moves meanwhile.',
+                    style: muted,
+                  ),
                 ],
               ),
             ),
@@ -698,89 +695,40 @@ class _AnalyseButton extends StatelessWidget {
       );
     }
     if (r == null || r.analysedCount == 0) {
-      return FilledButton.icon(
-        style: style,
-        onPressed: a.game.length == 0 ? null : a.startReview,
-        icon: const Icon(Icons.query_stats),
-        label: const Text('Analyse', style: TextStyle(fontSize: 16)),
+      final none = a.game.length == 0;
+      return Tooltip(
+        message: none
+            ? 'Open a game first'
+            : 'Stockfish checks every position at depth '
+                  '${s.settings.reviewDepth} and rates each move',
+        child: FilledButton.icon(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            textStyle: theme.textTheme.titleSmall,
+          ),
+          onPressed: none ? null : a.startReview,
+          icon: const Icon(Icons.query_stats),
+          label: const Text('Analyse game'),
+        ),
       );
     }
-    final w = summarize(a.moveReviews, Side.white);
-    final b = summarize(a.moveReviews, Side.black);
-    Widget side(String name, SideSummary x) => Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(name, style: theme.textTheme.labelMedium),
-          Text(
-            x.accuracy == null ? '–' : '${x.accuracy!.toStringAsFixed(1)}%',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (!s.settings.hideClassifications)
-            Wrap(
-              children: [
-                for (final c in [
-                  MoveClass.inaccuracy,
-                  MoveClass.mistake,
-                  MoveClass.blunder,
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Text(
-                      '${x.counts[c]}${classSymbol(c)}',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: classColor(c),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-        ],
-      ),
-    );
+    // A finished analysis needs no button; the review section says so.
+    if (r.complete) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-      decoration: BoxDecoration(
-        color: p.button,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+      decoration: p.cardBox(),
+      child: Row(
         children: [
-          if (!r.complete)
-            Text(
-              'Partial analysis: ${r.analysedCount}/${r.positions.length} '
-              'positions',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
-              ),
+          Icon(Icons.timelapse, size: 18, color: theme.colorScheme.error),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Partial analysis · ${r.analysedCount} of '
+              '${r.positions.length} positions',
+              style: theme.textTheme.bodyMedium,
             ),
-          Row(
-            children: [
-              side('White accuracy', w),
-              side('Black accuracy', b),
-              Column(
-                children: [
-                  FilledButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const ReviewScreen(),
-                      ),
-                    ),
-                    child: const Text('Report'),
-                  ),
-                  if (!r.complete || r.depth != s.settings.reviewDepth)
-                    TextButton(
-                      onPressed: a.startReview,
-                      child: Text(r.complete ? 'Re-run' : 'Resume'),
-                    ),
-                ],
-              ),
-            ],
           ),
+          TextButton(onPressed: a.startReview, child: const Text('Resume')),
         ],
       ),
     );
@@ -800,10 +748,7 @@ class _EnginePanel extends StatelessWidget {
     final muted = theme.textTheme.bodySmall?.copyWith(color: p.muted);
     Widget box(Widget child) => Container(
       padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
-      decoration: BoxDecoration(
-        color: p.panelHigh,
-        borderRadius: BorderRadius.circular(8),
-      ),
+      decoration: p.cardBox(),
       child: child,
     );
 
@@ -827,7 +772,7 @@ class _EnginePanel extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            'Engine',
+            'Live engine',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -842,9 +787,14 @@ class _EnginePanel extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
           ),
-        Switch(
-          value: a.engineOn,
-          onChanged: a.reviewing ? null : (_) => a.toggleEngine(),
+        Tooltip(
+          message: a.reviewing
+              ? 'Available when the game analysis is done'
+              : 'Live Stockfish analysis of the shown position (E)',
+          child: Switch(
+            value: a.engineOn,
+            onChanged: a.reviewing ? null : (_) => a.toggleEngine(),
+          ),
         ),
       ],
     );
@@ -874,8 +824,9 @@ class _EnginePanel extends StatelessWidget {
             header,
             Text(
               r == null
-                  ? 'Turn on to analyse this position with Stockfish.'
-                  : 'Analysis: ${r.eval.label} · depth ${r.depth}$best',
+                  ? 'Turn on to see Stockfish\'s best lines for this position.'
+                  : 'This position: ${r.eval.label} (${evalWords(r.eval)}) · '
+                        'depth ${r.depth}$best',
               style: muted,
             ),
             const SizedBox(height: 4),
@@ -1062,102 +1013,9 @@ class _PreviewBanner extends StatelessWidget {
   }
 }
 
-class _MoveCard extends StatelessWidget {
-  const _MoveCard(this.m);
-  final MoveReview m;
-
-  @override
-  Widget build(BuildContext context) {
-    final a = watchAnalysis(context);
-    final theme = Theme.of(context);
-    final p = PlyPalette.of(context);
-    final color = classColor(m.cls);
-    final moveNo =
-        '${a.game.positionAt(m.ply).fullmoves}${m.mover == Side.white ? '.' : '…'} ';
-    return Container(
-      decoration: BoxDecoration(
-        color: p.panelHigh,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              ClassBadge(m.cls, size: 22),
-              const SizedBox(width: 8),
-              MoveText(
-                m.san,
-                simple: a.settings.simpleNotation,
-                prefix: moveNo,
-                suffix: classSymbol(m.cls),
-                style: theme.textTheme.titleSmall,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                m.cls.label,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '${m.before.label} → ${m.after.label}',
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(m.explanation, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 4),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                m.cls == MoveClass.theory
-                    ? 'Opening book'
-                    : 'Engine finding · Stockfish depth ${m.depth}',
-                style: theme.textTheme.labelSmall?.copyWith(color: p.muted),
-              ),
-              for (final t in m.tags)
-                Chip(
-                  label: Text(t.label),
-                  labelStyle: theme.textTheme.labelSmall,
-                  padding: EdgeInsets.zero,
-                ),
-            ],
-          ),
-          if (m.cls.isError)
-            Row(
-              children: [
-                TextButton.icon(
-                  onPressed: () => a.goTo(m.ply),
-                  icon: const Icon(Icons.lightbulb_outline, size: 18),
-                  label: const Text('Show best move'),
-                ),
-                if (a.settings.saveHistory)
-                  TextButton.icon(
-                    onPressed: () => addToRevisit(
-                      context,
-                      a.game.positionAt(m.ply).fen,
-                      gameId: a.savedId,
-                      ply: m.ply,
-                    ),
-                    icon: const Icon(Icons.push_pin_outlined, size: 18),
-                    label: const Text('Revisit'),
-                  ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-}
-
+/// The game's moves as a two-column table (White, Black). The shown move is
+/// highlighted; rated moves carry a small symbol, coloured for errors and
+/// standout moves, with the rating as tooltip. Clicking a move shows it.
 class _MoveList extends StatelessWidget {
   const _MoveList({required this.currentKey});
   final GlobalKey currentKey;
@@ -1167,74 +1025,123 @@ class _MoveList extends StatelessWidget {
     final a = watchAnalysis(context);
     final theme = Theme.of(context);
     final p = PlyPalette.of(context);
-    final hide = a.settings.hideClassifications;
     final g = a.game;
     if (g.length == 0) {
       return Padding(
         padding: const EdgeInsets.all(8),
         child: Text(
-          'Play moves on the board, or load a game above.',
+          'No moves yet. Open a game, or play moves on the board.',
           style: theme.textTheme.bodySmall?.copyWith(color: p.muted),
         ),
       );
     }
-    final items = <Widget>[];
-    for (var i = 0; i < g.length; i++) {
-      final pos = g.positionAt(i);
-      if (pos.turn == Side.white || i == 0) {
-        items.add(
-          Padding(
-            padding: const EdgeInsets.only(left: 4, top: 3),
-            child: Text(
-              '${pos.fullmoves}${pos.turn == Side.white ? '.' : '…'}',
-              style: theme.textTheme.bodySmall?.copyWith(color: p.muted),
-            ),
-          ),
-        );
-      }
+    final hide = a.settings.hideClassifications;
+    // On a what-if line the game's move it branched from stays marked.
+    final shown = a.onWhatIf ? a.branch : a.ply;
+
+    Widget cell(int i) {
       final mr = hide || i >= a.moveReviews.length ? null : a.moveReviews[i];
-      final current = a.ply == i + 1;
-      final highlight =
+      final current = shown == i + 1;
+      final notable =
           mr != null &&
           (mr.cls.isError ||
               mr.cls == MoveClass.brilliant ||
               mr.cls == MoveClass.critical);
-      items.add(
-        InkWell(
-          key: current ? currentKey : null,
-          borderRadius: BorderRadius.circular(4),
-          onTap: () => a.goTo(i + 1),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-            decoration: current
-                ? BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.28),
-                    borderRadius: BorderRadius.circular(4),
-                  )
-                : null,
-            child: MoveText(
-              g.plies[i].san,
-              simple: a.settings.simpleNotation,
-              suffix: mr == null ? '' : classSymbol(mr.cls),
+      final text = MoveText(
+        g.plies[i].san,
+        simple: a.settings.simpleNotation,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontWeight: current ? FontWeight.w700 : null,
+        ),
+      );
+      final row = Row(
+        children: [
+          Flexible(child: text),
+          if (notable) ...[
+            const SizedBox(width: 4),
+            Text(
+              classSymbol(mr.cls),
               style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: current ? FontWeight.w700 : null,
-                color: highlight ? classColor(mr.cls) : null,
+                color: classColor(mr.cls),
+                fontWeight: FontWeight.w800,
               ),
             ),
+          ],
+        ],
+      );
+      final box = Container(
+        key: current ? currentKey : null,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: current
+            ? BoxDecoration(
+                color: theme.colorScheme.primary.withValues(
+                  alpha: a.onWhatIf ? 0.10 : 0.24,
+                ),
+                borderRadius: BorderRadius.circular(6),
+                border: a.onWhatIf
+                    ? Border.all(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.6),
+                      )
+                    : null,
+              )
+            : null,
+        child: row,
+      );
+      return Semantics(
+        button: true,
+        selected: current,
+        label: mr?.cls.label,
+        child: Tooltip(
+          message: mr == null ? '' : mr.cls.label,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(6),
+            onTap: () => a.goToGame(i + 1),
+            child: box,
+          ),
+        ),
+      );
+    }
+
+    final rows = <Widget>[];
+    // A game from a position with Black to move starts with "1… e5".
+    final offset = g.initial.turn == Side.black ? 1 : 0;
+    for (var r = 0; r * 2 - offset < g.length; r++) {
+      final w = r * 2 - offset, b = w + 1;
+      rows.add(
+        Container(
+          color: r.isOdd ? p.panelHigh.withValues(alpha: 0.5) : null,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 36,
+                child: Text(
+                  '${g.initial.fullmoves + r}.',
+                  textAlign: TextAlign.right,
+                  style: theme.textTheme.bodySmall?.copyWith(color: p.muted),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(child: w >= 0 ? cell(w) : const SizedBox()),
+              const SizedBox(width: 4),
+              Expanded(child: b < g.length ? cell(b) : const SizedBox()),
+            ],
           ),
         ),
       );
     }
     final result = g.result;
     if (result != '*') {
-      items.add(
+      rows.add(
         Padding(
-          padding: const EdgeInsets.only(left: 6, top: 2),
+          padding: const EdgeInsets.fromLTRB(42, 6, 0, 2),
           child: Text(result, style: theme.textTheme.bodyMedium),
         ),
       );
     }
-    return Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: items);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Column(children: rows),
+    );
   }
 }
 
@@ -1262,7 +1169,7 @@ class _Controls extends StatelessWidget {
           ),
           IconButton(
             tooltip: a.autoplaying ? 'Pause' : 'Play through the game',
-            onPressed: a.game.length == 0 ? null : a.toggleAutoplay,
+            onPressed: a.line.length == 0 ? null : a.toggleAutoplay,
             icon: Icon(
               a.autoplaying ? Icons.pause : Icons.play_arrow_outlined,
               size: 30,
@@ -1270,13 +1177,13 @@ class _Controls extends StatelessWidget {
           ),
           IconButton(
             tooltip: 'Next move',
-            onPressed: a.ply < a.game.length ? () => a.goTo(a.ply + 1) : null,
+            onPressed: a.ply < a.line.length ? () => a.goTo(a.ply + 1) : null,
             icon: const Icon(Icons.arrow_forward, size: 28),
           ),
           IconButton(
             tooltip: 'Last move',
-            onPressed: a.ply < a.game.length
-                ? () => a.goTo(a.game.length)
+            onPressed: a.ply < a.line.length
+                ? () => a.goTo(a.line.length)
                 : null,
             icon: const Icon(Icons.last_page, size: 30),
           ),

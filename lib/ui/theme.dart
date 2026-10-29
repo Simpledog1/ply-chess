@@ -16,36 +16,54 @@ class PlyPalette {
     required this.panelHigh,
     required this.input,
     required this.button,
+    required this.border,
     required this.text,
     required this.muted,
   });
 
   final Color background; // page
   final Color panel; // cards / side panel
-  final Color panelHigh; // section headers, tabs
+  final Color panelHigh; // raised cards inside panels, section headers
   final Color input; // fields
-  final Color button; // dark secondary button (Analyse)
+  final Color button; // accent-tinted secondary surface
+  final Color border; // hairlines around panels and cards
   final Color text;
   final Color muted;
 
   static const dark = PlyPalette(
-    background: Color(0xFF0C0F14),
-    panel: Color(0xFF1A1D23),
-    panelHigh: Color(0xFF23272E),
-    input: Color(0xFF15181D),
-    button: Color(0xFF1E2840),
-    text: Color(0xFFE8EAED),
-    muted: Color(0xFF9AA3AD),
+    background: Color(0xFF0E1116),
+    panel: Color(0xFF161A20),
+    panelHigh: Color(0xFF1F242C),
+    input: Color(0xFF11151A),
+    button: Color(0xFF1D2A45),
+    border: Color(0xFF2A313B),
+    text: Color(0xFFE6E9EE),
+    muted: Color(0xFF98A2AE),
   );
 
   static const light = PlyPalette(
-    background: Color(0xFFF1F3F6),
+    background: Color(0xFFF2F4F7),
     panel: Color(0xFFFFFFFF),
-    panelHigh: Color(0xFFE6E9EE),
-    input: Color(0xFFF6F7F9),
-    button: Color(0xFFDCE4F7),
-    text: Color(0xFF15181D),
-    muted: Color(0xFF5D6670),
+    panelHigh: Color(0xFFF0F2F6),
+    input: Color(0xFFF7F8FA),
+    button: Color(0xFFDDE6F8),
+    border: Color(0xFFDCE1E8),
+    text: Color(0xFF14181E),
+    muted: Color(0xFF5A6471),
+  );
+
+  /// Panel surface: rounded, with a hairline border.
+  BoxDecoration panelBox({double radius = 12}) => BoxDecoration(
+    color: panel,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: border),
+  );
+
+  /// Raised card inside a panel.
+  BoxDecoration cardBox({Color? accent, double radius = 10}) => BoxDecoration(
+    color: panelHigh,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: accent?.withValues(alpha: 0.6) ?? border),
   );
 
   static PlyPalette of(BuildContext context) =>
@@ -70,13 +88,65 @@ ThemeData plyTheme(Brightness b) {
         surfaceContainerHighest: p.panelHigh,
         secondaryContainer: p.button,
         onSecondaryContainer: p.text,
-        outlineVariant: p.panelHigh,
+        outline: p.border,
+        outlineVariant: p.border,
       );
+  final base = ThemeData(brightness: b, useMaterial3: true).textTheme;
+  final rounded = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(10),
+  );
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
     scaffoldBackgroundColor: p.background,
     visualDensity: VisualDensity.compact,
+    textTheme: base.copyWith(
+      titleLarge: base.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+      titleMedium: base.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+      titleSmall: base.titleSmall?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.1,
+      ),
+      labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+      bodySmall: base.bodySmall?.copyWith(height: 1.35),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        shape: rounded,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        shape: rounded,
+        side: BorderSide(color: p.border),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    ),
+    tooltipTheme: TooltipThemeData(
+      waitDuration: const Duration(milliseconds: 400),
+      textStyle: TextStyle(color: p.text, fontSize: 12),
+      decoration: BoxDecoration(
+        color: p.panelHigh,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: p.border),
+        boxShadow: const [BoxShadow(blurRadius: 8, color: Color(0x33000000))],
+      ),
+    ),
+    scrollbarTheme: const ScrollbarThemeData(
+      thickness: WidgetStatePropertyAll(6),
+      radius: Radius.circular(3),
+    ),
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      linearTrackColor: p.input,
+      linearMinHeight: 5,
+      borderRadius: BorderRadius.circular(3),
+    ),
     appBarTheme: AppBarTheme(
       backgroundColor: p.background,
       centerTitle: false,
@@ -86,7 +156,10 @@ ThemeData plyTheme(Brightness b) {
       elevation: 0,
       color: p.panel,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: p.border),
+      ),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: p.panel,
