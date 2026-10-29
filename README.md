@@ -2,75 +2,106 @@
 
 **Every move teaches.**
 
-Ply is a personal chess analysis app for Android. Load your games (PGN, FEN,
-or straight from Chess.com / Lichess), let a real Stockfish 19 engine running
-on your phone review every move, and see which kinds of mistakes keep coming
-back. No account, no subscription; the board, engine and saved games work
-offline.
+Ply is a post-game chess analysis app for Windows (and Android). Pick Lichess
+or Chess.com, type a username, open one of the recent games, and let
+Stockfish 19, running on your own PC, find the mistakes, the better moves and
+what to learn from them. No account, no subscription, no cloud.
 
-<p>
-  <img src="docs/screenshots/analyze_top.png" width="24%" alt="Analyze screen with the Game Analysis panel">
-  <img src="docs/screenshots/analyze.png" width="24%" alt="Reviewed game with move classifications">
-  <img src="docs/screenshots/review.png" width="24%" alt="Game review report">
-  <img src="docs/screenshots/settings_sheet.png" width="24%" alt="Analysis settings">
-</p>
+![Ply on Windows: recent games, board, and the review of a game](docs/screenshots/desktop_review.png)
 
-<sub>Screenshots are rendered from the app's real widget tree with a real
-Stockfish 19 review (`test/render_screens_test.dart`), not captured on a phone.
-The game is Morphy's 1858 "Opera Game".</sub>
+<sub>Screenshots are rendered from Ply's real widget tree with a real
+Stockfish 19 analysis (`test/render_screens_test.dart`). The game is Morphy's
+1858 "Opera Game".</sub>
 
-## Features
+## Install on Windows
 
-**Board**
-- Tap-to-move and drag-and-drop, legal-move dots, last-move and check
-  highlights, promotion picker, flip, coordinates
-- Cburnett pieces (SVG, sharp at any size); slate-blue board
-- Move list in figurine or plain SAN ("Simple Move Notation"), kept in sync
-  with the board; first / previous / play-through / next / last controls;
-  playing a different move mid-game replaces the rest, with Undo
-- Player tabs with captured material
+1. Download `Ply-Setup-1.1.0.exe` (or the portable
+   `Ply-1.1.0-windows-x64-portable.zip`).
+2. Run the installer. It installs for your user only, needs no administrator
+   rights, adds Ply to the Start menu and optionally to the desktop.
+   *Portable zip:* unzip anywhere and run `Ply\Ply.exe`.
+3. Windows SmartScreen may warn that the app is unrecognised, because it is
+   not code-signed. Choose **More info → Run anyway**.
 
-**Load and share**
-- "Load game from" PGN (paste or open a file), FEN, **Chess.com** or
-  **Lichess**: enter a username, tap *Search Games*, pick a recent game.
-  Online loading uses the sites' public, no-login APIs and is optional.
-- Share Game: FEN and PGN with copy buttons, or save a `.pgn` file. Reviewed
-  games export with classifications as NAGs and engine comments.
+Requirements: 64-bit Windows 10 or 11. Nothing else to install: Stockfish is
+included.
 
-**Engine (Stockfish 19, on the device)**
-- Live analysis with depth or time limit, up to five lines (MultiPV),
-  suggestion arrows (off / best move / all lines)
-- Tap a move in an engine line to step through it on the board, then
-  optionally play it into the game
-- Evaluation bar and labels always from White's point of view
-  (`+` favours White, `−` favours Black); mates shown as `#3` / `#-3`
-- Partial searches are labelled as partial (stopped / depth n of m)
+**Update:** run the newer `Ply-Setup-x.y.z.exe`; it replaces the old version
+and keeps your settings and history.
+**Uninstall:** Windows Settings → Apps → Installed apps → Ply → Uninstall.
+Your settings and any saved history stay in `%APPDATA%\Simpledog1\Ply`; delete
+them first in Ply (Settings → Profiles & privacy) or remove that folder.
 
-**Game analysis and blunder detection** (the *Analyse* button)
-- Every position is searched at the *same* fixed depth with two lines, so
-  before/after evaluations are comparable
-- Classes: Brilliant, Critical, Best, Excellent, Good, Theory, Inaccuracy,
-  Mistake, Blunder, Forced (see below); Brilliant, Critical and Theory can be
-  switched off, and all classifications can be hidden
-- Tags for missed mates, allowed mates, missed wins and missed tactics
-- Explanations are assembled only from Stockfish's output (its preferred
-  move and the line after your move) and labelled as engine findings
-- Report: accuracy estimates with their limitations, counts per side,
-  winning-chances graph, critical moments, missed opportunities and every
-  move; tap anything to jump there
-- Stop and resume at any time; results are saved with the game
+## Using Ply
 
-**Games and insights**
-- Local library with search and filters (result, colour, time control),
-  editable details, and which side you played
-- Insights from your own moves in reviewed games: accuracy and its trend,
-  accuracy by phase, errors per game, results, openings with repeated early
-  errors, missed tactics to retry, positions you pinned
-- Weakness categories (tactics, defence, converting advantages, opening,
-  quiet middlegames, endgame) are only called **recurring** with enough
-  evidence: at least 5 reviewed games, at least 30 relevant moves, errors in
-  at least 3 different games, and a rate at least 25% above your own
-  average. Otherwise Ply says "Not enough data" or "In line with your average".
+1. **Choose the site** (Lichess or Chess.com) in the top bar and **type a
+   username**, then press Enter or **Load games**. Recent public games
+   appear on the left, newest first; **Load more** fetches older ones.
+   Usernames you used before are suggested as you type.
+2. **Click a game.** The board turns to your side when the username played
+   in it.
+3. Press **Analyse**. Stockfish checks every position at the same depth
+   (14 by default: a few seconds to a minute on a typical PC).
+4. Open the **Review** tab: key mistakes with the move played, Stockfish's
+   move, the evaluation before → after and the engine's line, plus
+   **learning points** (missed tactics, hanging pieces, back-rank mates,
+   missed defences…). **Show move** and **Find the best move** jump to the
+   position. **Deeper review** re-runs at depth 20 when you have time.
+5. Close the window when you are done.
+
+You can also paste a PGN, open a `.pgn` file or load a FEN (buttons under the
+game list), and share or export the analysed game as PGN.
+
+**Keyboard:** ← / → previous / next move · Home / End (or ↑ / ↓) first / last ·
+F flip the board · Space play through the game · E engine on/off.
+
+Live engine analysis of the current position (the **Engine** switch) shows
+the evaluation, up to five lines and suggestion arrows. Depth, number of
+lines, time limit and arrows are in the gear (Analysis Settings).
+
+## Your data: profiles and local history
+
+- A **profile** is a site plus a username (`Lichess · magnus` and
+  `Chess.com · magnus` are different profiles). Ply remembers the usernames
+  you use, but a username only tells Ply whose *public* games to load; it does
+  not prove the account is yours.
+- **Local history is off by default.** Games you load and the analysis you
+  run stay in memory and are gone when Ply closes.
+- Turn it on in **Settings → Profiles & privacy** (or when you press the save
+  button) to keep reviewed games on this PC: the game (PGN), date, players,
+  time control, result, opening, move-by-move evaluations and classifications.
+  This feeds **History** and **Insights**, which aggregate your mistakes over
+  several games and only call something recurring with enough evidence
+  (at least 3 games out of 5 or more reviewed). The History screen always
+  says whether local history is on.
+- **Delete:** Settings → Profiles & privacy → the bin icon next to a profile
+  removes that username and all its saved games; **Delete all local history**
+  removes every saved game. Settings (preferences, usernames) and game records
+  are kept in separate files.
+- Location: `%APPDATA%\Simpledog1\Ply` (`settings.json`, `ply_data.json`).
+  Nothing is written to the installation folder.
+
+**Privacy.** Ply has no accounts, no telemetry and no server. The only
+network requests go to the official Lichess and Chess.com public APIs, and
+only send the username you entered. Ply never asks for passwords, cookies or
+API tokens. Ply is independent and not affiliated with Lichess, Chess.com or
+the Stockfish project.
+
+## Where games come from
+
+- **Lichess:** the documented game export API (`/api/games/user/{name}`) in
+  PGN, 20 games per page (configurable), standard chess only (rated and
+  casual). Older pages use the `until` timestamp of the last game. The
+  account is checked first with `/api/user/{name}`.
+- **Chess.com:** the Published-Data API: the profile (`/pub/player/{name}`),
+  the list of monthly archives, and then only as many recent months as
+  needed for the page. Variants (Chess960 etc.) are skipped.
+- Results are cached in memory for 10 minutes. Requests time out after 20
+  seconds and can be cancelled. Unknown users, closed accounts, rate limits
+  (HTTP 429), site outages and no internet each get a plain message, and a
+  failed request never shows stale or invented games.
+- Only **public** games are available. If a profile's games cannot be
+  loaded, paste the PGN or open a PGN file instead.
 
 ## How the analysis works
 
@@ -79,13 +110,14 @@ White's perspective, then to White's winning chance with the Lichess curve
 
     win% = 50 + 50 × (2 / (1 + e^(−0.00368208 × cp)) − 1)      (cp clamped to ±1000; mate = 0% or 100%)
 
-A move's **loss** is the drop in the *mover's* win% from the position before
-to the position after the move.
+Every position of the game is searched at the same fixed depth with two
+lines, so before/after values are comparable. A move's **loss** is the drop
+in the *mover's* winning chance.
 
 | Class | Rule |
 |---|---|
-| Theory | Every position from the start up to this move is in the opening list |
-| Brilliant | Stockfish's first choice that gives up material (a non-pawn piece the opponent can take for less than it is worth), while not losing (win% after ≥ 45) and not already totally winning (≤ 95) |
+| Theory | Every position up to this move is in the Lichess opening list |
+| Brilliant | Stockfish's first choice that gives up material (a piece the opponent can take for less than it is worth) while not losing (win% after ≥ 45) and not already totally winning (≤ 95) |
 | Critical | Stockfish's first choice, and its second choice is at least 10 win% worse |
 | Best | Stockfish's first choice |
 | Excellent | loss < 2 |
@@ -95,137 +127,131 @@ to the position after the move.
 | Blunder | loss ≥ 15 |
 | Forced | the only legal move |
 
-Inaccuracy/mistake/blunder thresholds are Lichess's defaults and can be
+Inaccuracy, mistake and blunder thresholds are Lichess's defaults and can be
 changed in Settings. Checkmate, stalemate and insufficient material are
 decided by the rules, not the engine. Move accuracy uses the Lichess formula
 `103.1668 × e^(−0.04354 × loss) − 3.1669 + 1`; game accuracy is the plain
-average over your moves, leaving out theory and forced moves.
+average over your moves, leaving out book and forced moves.
 
-**Limitations of these numbers:** they depend on the analysis depth (default
-14 on a phone, far below a server analysis), every move counts equally,
-multi-threaded searches vary slightly between runs, and the values are not
-comparable with Chess.com or Lichess accuracy. Brilliant uses a simple
-static material check, not a full exchange evaluation. "Missed tactic" means
-the engine's move was a capture, check or promotion where you made a mistake
-or blunder; it is a heuristic. Game phase is estimated from move number and
-remaining material.
+**Learning points** come only from moves the engine flagged, each with a
+concrete reason from the engine's lines: missed or allowed forced mate,
+back-rank mate (the mate lands on your first rank), a piece left hanging (the
+engine's reply wins it), a missed fork (the best move attacks two valuable
+targets), other missed tactics, king safety (the reply starts with a check),
+a missed defensive or drawing resource, a winning position that slipped, a
+poor exchange, and opening errors.
 
-## Technology
+**Limits of these numbers:** they depend on depth (14 is quick, not a full
+server analysis), every move counts the same, multi-threaded searches vary a
+little between runs, and they are not comparable with Chess.com or Lichess
+accuracy. Brilliant uses a simple material check, not a full exchange
+calculation; tactic and fork detection are heuristics. Explanations are
+assembled from Stockfish's moves and lines, not written by a language model.
 
-- **Flutter 3.47 / Dart 3.13**: one codebase with a reliable Android
-  toolchain and fast custom painting for the board. The analysis, storage and
-  UI logic are plain Dart and unit-test well on a desktop.
-- **[dartchess](https://pub.dev/packages/dartchess)** (the Lichess team's Dart
-  chess library) for legal moves, SAN, FEN and PGN, instead of writing chess
-  rules from scratch.
-- **Stockfish 19**: the official Android arm64 release binary, packaged as
-  `libstockfish.so` so Android extracts it to the app's native library
-  directory, the only place an app may execute files from (Android 10+). The
-  app runs it as a child process and speaks UCI over stdin/stdout. No NDK
-  build; the binary is byte-identical to the official release.
-- **Opening names** from the Lichess
-  [chess-openings](https://github.com/lichess-org/chess-openings) list (CC0),
-  indexed in a background isolate at startup.
-- Storage is one JSON file in the app's private storage, written atomically
-  (temp file + rename). An unreadable file is set aside, never overwritten.
+## Troubleshooting
 
-```
-lib/
-  chess/       game model on dartchess: moves, FEN, PGN
-  engine/      UCI client (uci.dart) and the Stockfish process service
-  analysis/    evaluation, classification, opening book, review runner, insights
-  online/      Chess.com / Lichess public game download
-  storage/     saved games, positions to revisit, settings
-  ui/          board, screens, controller
-```
+- **"No Lichess/Chess.com player named …"**: check the spelling and the site
+  switch. The account must exist and be public.
+- **"… is rate-limiting requests"**: the site asked Ply to slow down; wait a
+  minute.
+- **"No internet connection"**: loading games needs the internet; analysis,
+  PGN files and history work offline.
+- **"Stockfish is missing from the Ply folder"**: an antivirus may have
+  quarantined `stockfish\stockfish.exe`; restore it or reinstall Ply.
+- **Analysis is slow**: lower the analysis depth in the gear menu, or raise
+  Threads in Settings → Engine.
+- **Check the engine**: Settings → Engine → Check engine runs a short search
+  and reports Stockfish's speed.
 
-## Build
+## Build from source
 
-Requirements: Flutter 3.47+, JDK 17, Android SDK (platform 36), and internet
-access for the first build (Gradle downloads the Stockfish release, about
-80 MB, and verifies its SHA-256).
+Requirements: Flutter 3.47+, Visual Studio 2022 (or Build Tools) with
+"Desktop development with C++", Windows **Developer Mode** turned on
+(Flutter needs symlinks for plugins), and internet for the first build.
 
 ```bash
 flutter pub get
-flutter build apk --release --target-platform android-arm64
+flutter build windows --release
 ```
 
-Output: `build/app/outputs/flutter-apk/app-release.apk` (about 85 MB; the Stockfish binary with its embedded neural network is 100 MB uncompressed).
+The app is written to `build\windows\x64\runner\Release\`. CMake downloads
+`stockfish-windows-x86-64-universal.zip` from the official `sf_19` release,
+checks the archive and binary SHA-256, and installs the unmodified binary as
+`stockfish\stockfish.exe` with its license, authors and source.
 
-The Gradle task `fetchStockfish` (`android/app/build.gradle.kts`) downloads
-`stockfish-android-arm64-universal.tar.gz` from the `sf_19` release, checks
-the archive and binary checksums, and stages the binary under `build/`.
-Nothing large is committed to git. `android/gradle.properties` disables
-Kotlin incremental compilation, which breaks on Windows when the project and
-the pub cache are on different drives.
+Installer (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)):
 
-The release build is signed with your local Android debug key, which is fine
-for installing on your own phone. Add a real signing config before
-publishing it anywhere.
+```bash
+ISCC.exe installer\ply.iss
+```
 
-### Install on a phone
+Output: `build\installer\Ply-Setup-1.1.0.exe`.
 
-1. Copy `app-release.apk` to the phone (or run `adb install app-release.apk`).
-2. Allow "Install unknown apps" for your file manager when Android asks.
-3. Open Ply → Settings → **Check engine** to confirm Stockfish starts and
-   searches on your device.
+**Android** (arm64, Android 10+): `flutter build apk --release
+--target-platform android-arm64`; Gradle downloads and verifies the official
+Stockfish 19 Android binary. On phones and narrow windows Ply uses a
+single-column layout with a bottom navigation bar.
 
-Requires Android 10 (API 29) or newer on a 64-bit ARM (arm64-v8a) device,
-which covers nearly all phones from recent years.
-
-## Tests
+### Tests
 
 ```bash
 flutter analyze
 flutter test
 ```
 
-Unit and widget tests cover legal moves, castling, en passant, promotion,
-checkmate and stalemate, FEN/PGN parsing and errors, UCI parsing and engine
-lifecycle (handshake, stop, superseded searches, crash, timeout), evaluation
-perspective, every classification rule including mate tags, the opening
-book, the review runner (cancel/resume), storage round trips and corrupt-file
-handling, insights evidence rules, multi-game PGN splitting, and tapping
-moves on the board.
+Covers chess rules (castling, en passant, promotion, mate, stalemate), FEN
+and PGN parsing and malformed input, UCI parsing and engine lifecycle
+(handshake, stop, superseded searches, crash, timeout), evaluation
+perspective, all classification rules and learning points, username
+validation and profile keys, paged Lichess/Chess.com retrieval and every
+error path against recorded-style fixtures, profile memory, history on/off
+and deletion, and an end-to-end desktop flow (choose site, enter username,
+load games, analyse with a scripted engine, inspect the mistake, shut the
+engine down).
 
-Optional tests, skipped unless enabled:
+Optional checks, skipped unless enabled:
 
 ```bash
-# Against a real Stockfish binary for your desktop OS
-STOCKFISH_PATH=/path/to/stockfish flutter test test/stockfish_integration_test.dart
-# Against the live Chess.com and Lichess APIs
+# Real Stockfish
+STOCKFISH_PATH=build/windows/x64/runner/Release/stockfish/stockfish.exe flutter test test/stockfish_integration_test.dart
+# Live Lichess and Chess.com APIs
 PLY_ONLINE=1 flutter test test/online_live_test.dart
-# Regenerate the screenshots
-PLY_RENDER_DIR=docs/screenshots STOCKFISH_PATH=/path/to/stockfish flutter test test/render_screens_test.dart
+# Regenerate screenshots / the Windows icon
+PLY_RENDER_DIR=docs/screenshots STOCKFISH_PATH=... flutter test test/render_screens_test.dart
+PLY_ICON_OUT=windows/runner/resources/app_icon.ico flutter test test/make_icon_test.dart
+```
+
+```
+lib/
+  chess/       game model on dartchess: moves, FEN, PGN
+  engine/      UCI client (uci.dart) and the Stockfish process service
+  analysis/    evaluation, classification, learning points, openings, insights
+  online/      Lichess / Chess.com paged retrieval, games browser
+  storage/     settings and profiles, optional local history
+  ui/          board, desktop and phone layouts, screens
+windows/       Flutter Windows runner + Stockfish bundling (CMake)
+installer/     Inno Setup script
 ```
 
 ## Known limitations
 
-- **Not yet tested on a phone or emulator.** The development PC has no
-  hypervisor enabled, so the Android emulator cannot run. Engine behaviour is
-  verified on desktop with the same Stockfish 19 version, and the APK's
-  packaging (binary checksum, `extractNativeLibs`) is verified, but the first
-  on-device run is still to be done. Use Settings → Check engine.
-- Only arm64-v8a is supported. 32-bit ARM and x86 devices are not.
-- Ply keeps the mainline of a game. PGN side variations and comments are
-  dropped on import (review annotations are added on export).
-- Standard chess only (no Chess960 or other variants).
-- Chess.com search covers up to 40 standard games from the last six months;
-  Lichess the last 40.
+- The installer is not code-signed, so SmartScreen warns on first run.
+- Windows x64 only (Windows on ARM runs it through x64 emulation).
+- Only public games; Ply keeps the mainline of a game (side variations and
+  PGN comments are dropped on import; analysis is added on export).
+- Standard chess only; no Chess960 or other variants.
 - Threefold repetition and the 50-move rule are not announced on the board,
-  although the engine sees the move history and scores repetitions as draws.
-- A long game at a high depth takes minutes on a phone and stops if Android
-  kills the app.
+  though the engine scores repetitions as draws.
 
 ## Licenses
 
 - Ply's own code: MIT (`LICENSE`).
-- Stockfish 19: GPL-3.0. Cburnett pieces: GPL-2.0-or-later. dartchess:
-  GPL-3.0. Because these are bundled, the distributed APK as a whole is under
+- Stockfish 19: GPL-3.0 (binary, license and source are in the `stockfish`
+  folder of every install). Cburnett pieces: GPL-2.0-or-later. dartchess:
+  GPL-3.0. Because these are bundled, the distributed app as a whole is under
   the GPL-3.0; this repository plus the referenced upstream sources is its
   complete source.
 - Opening names: CC0 (Lichess chess-openings).
 
-Ply is not affiliated with Chess.com, Lichess or the Stockfish project.
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for versions, sources,
-checksums and attribution.
+checksums and attribution, and [CHANGELOG.md](CHANGELOG.md) for what changed.

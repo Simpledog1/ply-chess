@@ -15,6 +15,7 @@ import 'package:ply/analysis/review_runner.dart';
 import 'package:ply/chess/chess_game.dart';
 import 'package:ply/engine/engine_service.dart';
 import 'package:ply/online/games_browser.dart';
+import 'package:ply/online/online_games.dart';
 import 'package:ply/engine/uci.dart';
 import 'package:ply/main.dart';
 import 'package:ply/storage/game_store.dart';
@@ -125,7 +126,19 @@ void main() {
           store: store,
           settings: settings,
         ),
-        browser: GamesBrowser(settings: settings),
+        // Recent-games panel fed from a local fixture, not the network.
+        browser: GamesBrowser(
+          settings: settings,
+          httpGet: (uri, accept) async => uri.path.startsWith('/api/user/')
+              ? const HttpReply(200, '{"username":"Morphy"}')
+              : HttpReply(
+                  200,
+                  opera.replaceFirst(
+                    '[Site "Paris FRA"]',
+                    '[Site "https://lichess.org/opera1858"]',
+                  ),
+                ),
+        ),
         tab: ValueNotifier(0),
         child: RepaintBoundary(key: key, child: const PlyApp()),
       );
@@ -136,6 +149,7 @@ void main() {
         ]),
       );
       services.analysis.loadSaved(saved, atPly: 22);
+      await services.browser.open(ChessSite.lichess, 'Morphy');
     });
 
     tester.view.physicalSize = const Size(1080, 2340);
@@ -153,7 +167,9 @@ void main() {
       await tester.runAsync(() async {
         final boundary =
             key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-        final image = await boundary.toImage(pixelRatio: 2.625);
+        final image = await boundary.toImage(
+          pixelRatio: tester.view.devicePixelRatio,
+        );
         final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
         Directory(out!).createSync(recursive: true);
         File('$out/$name.png').writeAsBytesSync(bytes!.buffer.asUint8List());
@@ -186,6 +202,15 @@ void main() {
     await shot('insights');
     services.tab.value = 3;
     await shot('settings');
+
+    // Desktop (Windows) layout.
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    services.tab.value = 0;
+    services.analysis.goTo(17);
+    await shot('desktop_analyze');
+    await tester.tap(find.widgetWithText(Tab, 'Review'));
+    await shot('desktop_review');
     dir.deleteSync(recursive: true);
   }, skip: skip != null);
 }
