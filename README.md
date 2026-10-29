@@ -7,7 +7,9 @@ or Chess.com, type a username, open one of the recent games, and let
 Stockfish 19, running on your own PC, find the mistakes, the better moves and
 what to learn from them. No account, no subscription, no cloud.
 
-![Ply on Windows: recent games, board, and the review of a game](docs/screenshots/desktop_review.png)
+![Ply on Windows: recent games, the board, the rating of the shown move, the moves and the game review on one screen](docs/screenshots/desktop_analyze.png)
+
+![Trying your own move: Ply checks it with Stockfish and labels it as a what-if](docs/screenshots/desktop_whatif.png)
 
 <sub>Screenshots are rendered from Ply's real widget tree with a real
 Stockfish 19 analysis (`test/render_screens_test.dart`). The game is Morphy's
@@ -15,8 +17,8 @@ Stockfish 19 analysis (`test/render_screens_test.dart`). The game is Morphy's
 
 ## Install on Windows
 
-1. Download `Ply-Setup-1.1.0.exe` (or the portable
-   `Ply-1.1.0-windows-x64-portable.zip`).
+1. Download `Ply-Setup-1.2.0.exe` (or the portable
+   `Ply-1.2.0-windows-x64-portable.zip`).
 2. Run the installer. It installs for your user only, needs no administrator
    rights, adds Ply to the Start menu and optionally to the desktop.
    *Portable zip:* unzip anywhere and run `Ply\Ply.exe`.
@@ -40,20 +42,43 @@ them first in Ply (Settings → Profiles & privacy) or remove that folder.
    Usernames you used before are suggested as you type.
 2. **Click a game.** The board turns to your side when the username played
    in it.
-3. Press **Analyse**. Stockfish checks every position at the same depth
-   (14 by default: a few seconds to a minute on a typical PC).
-4. Open the **Review** tab: key mistakes with the move played, Stockfish's
-   move, the evaluation before → after and the engine's line, plus
-   **learning points** (missed tactics, hanging pieces, back-rank mates,
-   missed defences…). **Show move** and **Find the best move** jump to the
-   position. **Deeper review** re-runs at depth 20 when you have time.
-5. Close the window when you are done.
+3. Press **Analyse game**. Stockfish checks every position at the same depth
+   (14 by default: a few seconds to a minute on a typical PC). You can keep
+   browsing while it works; results appear as they come in.
+4. Everything stays on one screen, next to the board:
+   - **The move card** rates the shown move (Best, Excellent, Good,
+     Inaccuracy, Mistake, Blunder…) in plain words, with the evaluation
+     before → after, Stockfish's move (**Show line** plays it out on the
+     board) and what follows. It updates as you step through the game.
+   - **The move list** marks inaccuracies, mistakes, blunders and standout
+     moves with their symbol (`?!`, `?`, `??`, `!`, `!!`); hover for the
+     rating, click to go there.
+   - **Game review** (collapsible, under the moves): result, accuracy
+     estimate and error counts per side, a winning-chances graph, the key
+     moments, moves worth recognising and **learning points** (missed
+     tactics, hanging pieces, back-rank mates, missed defences…). Click any
+     of them to jump to that position; the bulb button goes to the position
+     before a mistake so you can look for the better move. **Deeper review**
+     re-runs at depth 20 when you have time.
+5. **Try your own moves.** Move a piece on the board of a loaded game and
+   Ply starts a **what-if line**: the game itself and its review stay
+   untouched. The move card shows "Checking your move…" at once (with
+   Stockfish's preferred move when known), then the rating, labelled
+   *Your what-if move*. Keep playing to continue the line; **Undo**
+   (Backspace) takes the last move back, **Back to game** (Esc) returns to
+   where you left the game.
+6. Close the window when you are done.
 
 You can also paste a PGN, open a `.pgn` file or load a FEN (buttons under the
 game list), and share or export the analysed game as PGN.
 
+On a new board or a FEN position (no moves yet) the board edits the game
+itself, and each move you play is checked the same way. Once you analyse
+it, further moves become what-ifs.
+
 **Keyboard:** ← / → previous / next move · Home / End (or ↑ / ↓) first / last ·
-F flip the board · Space play through the game · E engine on/off.
+F flip the board · Space play through the game · E engine on/off ·
+Backspace take back a what-if move · Esc back to the game.
 
 Live engine analysis of the current position (the **Engine** switch) shows
 the evaluation, up to five lines and suggestion arrows. Depth, number of
@@ -128,7 +153,20 @@ in the *mover's* winning chance.
 | Forced | the only legal move |
 
 Inaccuracy, mistake and blunder thresholds are Lichess's defaults and can be
-changed in Settings. Checkmate, stalemate and insufficient material are
+changed in Settings. They are a convention, not a universal standard.
+Because the comparison is in winning chances, a move in an already lost (or
+already won) position costs little, and a forced move is never an error.
+
+**What-if moves** use exactly the same rule. Ply reuses the stored analysis
+of every position the line shares with the game and searches only the new
+positions, at the review's depth with two lines, in the background. Results
+are kept per position (FEN + depth), so revisiting a position costs nothing
+and a result can never be shown for the wrong position; moving on stops the
+outdated search. A move is only rated once both positions around it are
+analysed; until then Ply says it is checking (or that the game is not
+analysed yet) instead of guessing. The plain-language words for evaluations
+("White is better", "about equal") are Ply's own rough cut-offs (0.4, 1.2 and
+3 pawns). Checkmate, stalemate and insufficient material are
 decided by the rules, not the engine. Move accuracy uses the Lichess formula
 `103.1668 × e^(−0.04354 × loss) − 3.1669 + 1`; game accuracy is the plain
 average over your moves, leaving out book and forced moves.
@@ -185,7 +223,7 @@ Installer (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)):
 ISCC.exe installer\ply.iss
 ```
 
-Output: `build\installer\Ply-Setup-1.1.0.exe`.
+Output: `build\installer\Ply-Setup-1.2.0.exe`.
 
 **Android** (arm64, Android 10+): `flutter build apk --release
 --target-platform android-arm64`; Gradle downloads and verifies the official
@@ -206,8 +244,12 @@ perspective, all classification rules and learning points, username
 validation and profile keys, paged Lichess/Chess.com retrieval and every
 error path against recorded-style fixtures, profile memory, history on/off
 and deletion, and an end-to-end desktop flow (choose site, enter username,
-load games, analyse with a scripted engine, inspect the mistake, shut the
-engine down).
+load games, analyse with a scripted engine, jump to the blunder from the
+inline review, try a what-if move and return to the game, shut the engine
+down), and what-if behaviour: the game and review stay unchanged, undo,
+perspective of Black's moves, forced moves and mate scores, no rating
+without analysis, and stale engine results that cannot reach a newer
+position.
 
 Optional checks, skipped unless enabled:
 
@@ -240,6 +282,9 @@ installer/     Inno Setup script
 - Only public games; Ply keeps the mainline of a game (side variations and
   PGN comments are dropped on import; analysis is added on export).
 - Standard chess only; no Chess960 or other variants.
+- What-if lines are kept in memory only: they are not saved to history or
+  exported, and only one line is kept at a time (playing a different move
+  earlier replaces it).
 - Threefold repetition and the 50-move rule are not announced on the board,
   though the engine scores repetitions as draws.
 

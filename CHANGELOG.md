@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.2.0 — One-screen analysis and move feedback
+
+### Added
+- **Move card**: the shown move's rating in plain words (Best, Excellent,
+  Good, Inaccuracy, Mistake, Blunder…), the evaluation before → after with a
+  short description ("White is better"), Stockfish's move with **Show line**,
+  and what follows. It updates on every step through the game, and shows an
+  honest pending state ("Checking your move…", "Analysis not available yet")
+  instead of a guess.
+- **What-if moves**: moving a piece on an analysed or loaded game starts a
+  separate line, labelled *Your what-if move*. Stockfish checks the new
+  position in the background at the review's depth, reusing the stored
+  analysis for everything else. **Undo** (Backspace) and **Back to game**
+  (Esc) return to the game; the game and its review are never changed.
+- Results of background checks are cached per position, and outdated
+  searches are stopped when you move on, so a result cannot appear on the
+  wrong move.
+
+### Changed
+- **The game review is on the analysis screen.** The Review tab and the
+  separate report page are gone; summary, winning-chances graph, key
+  moments, well-played moves and learning points sit under the move list
+  (collapsible) and jump to their positions on the board.
+- **Redesigned interface**: refined dark and light themes, bordered panels,
+  a clearer Analyse game button with progress, a two-column move list with
+  quality symbols and tooltips, a what-if bar under the board, a welcome
+  card, tooltips on secondary controls, and layouts checked at 1366×768,
+  1440×900 and 1920×1080.
+- Moves played on a new board or FEN position are also checked in the
+  background; once a game is analysed, board moves become what-ifs.
+- The live engine is keyed to the shown position, so it never shows a line
+  for a different position after you switch lines.
+
+
 ## 1.1.0 — Windows desktop app
 
 ### Added
