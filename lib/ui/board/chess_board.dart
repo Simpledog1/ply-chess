@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:dartchess/dartchess.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme.dart';
@@ -168,11 +169,15 @@ class _ChessBoardState extends State<ChessBoard> {
 
   @override
   Widget build(BuildContext context) {
+    final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
     return AspectRatio(
       aspectRatio: 1,
       child: LayoutBuilder(
         builder: (context, c) {
-          final size = c.maxWidth;
+          // Squares a whole number of physical pixels wide, so square edges
+          // and pieces are not smeared across two pixels at any window size
+          // or display scaling (the board may come out up to 8 px smaller).
+          final size = math.max(8, (c.maxWidth * dpr / 8).floor() * 8) / dpr;
           final sq = size / 8;
           final pos = widget.position;
           final king = pos.isCheck ? pos.board.kingOf(pos.turn) : null;
@@ -248,7 +253,7 @@ class _ChessBoardState extends State<ChessBoard> {
               ),
             );
           }
-          return Semantics(
+          final board = Semantics(
             label: 'Chessboard',
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -289,10 +294,69 @@ class _ChessBoardState extends State<ChessBoard> {
               ),
             ),
           );
+          return Align(
+            alignment: Alignment.topLeft,
+            child: _PixelSnap(
+              dpr: dpr,
+              child: SizedBox.square(dimension: size, child: board),
+            ),
+          );
         },
       ),
     );
   }
+}
+
+/// Paints its child shifted by under one physical pixel so that the child's
+/// top-left corner falls on a whole physical pixel.
+/// shortcut: the shift is computed when painting; a board inside a scrolled
+/// layer that moves without repainting could be off by a fraction of a pixel
+/// until its next repaint. Fine for Ply's fixed board placements.
+class _PixelSnap extends SingleChildRenderObjectWidget {
+  const _PixelSnap({required this.dpr, super.child});
+  final double dpr;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderPixelSnap(dpr);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderPixelSnap r) =>
+      r.dpr = dpr;
+}
+
+class _RenderPixelSnap extends RenderProxyBox {
+  _RenderPixelSnap(this._dpr);
+
+  double _dpr;
+  set dpr(double v) {
+    if (v == _dpr) return;
+    _dpr = v;
+    markNeedsPaint();
+  }
+
+  Offset _shift = Offset.zero;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final child = this.child;
+    if (child == null) return;
+    final global = MatrixUtils.transformPoint(
+      getTransformTo(null),
+      Offset.zero,
+    );
+    double snap(double v) => (v * _dpr).roundToDouble() / _dpr;
+    _shift = Offset(snap(global.dx), snap(global.dy)) - global;
+    context.paintChild(child, offset + _shift);
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
+      super.hitTestChildren(result, position: position - _shift);
+
+  @override
+  void applyPaintTransform(RenderBox child, Matrix4 transform) =>
+      transform.translateByDouble(_shift.dx, _shift.dy, 0, 1);
 }
 
 class _SquaresPainter extends CustomPainter {

@@ -203,13 +203,17 @@ class _BoardArea extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, c) {
         const barW = 18.0, gap = 4.0, tab = 30.0;
-        final double size = math.max(
+        final double fit = math.max(
           160.0,
           math.min(
             c.maxWidth.isFinite ? c.maxWidth - barW - gap : 600.0,
             maxHeight - 2 * tab,
           ),
         );
+        // Same whole-pixel size the board snaps to, so the shadow and player
+        // tabs line up with it exactly.
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+        final size = (fit * dpr / 8).floor() * 8 / dpr;
         final pos = a.shownPosition;
         final last = a.preview != null
             ? a.previewUcis![a.previewIndex]
