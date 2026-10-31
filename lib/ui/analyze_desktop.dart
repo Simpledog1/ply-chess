@@ -257,23 +257,12 @@ class _GamesView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = PlyPalette.of(context);
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Your games', style: theme.textTheme.titleSmall),
-              Text(
-                'Choose the site and type a username in the bar at the top, '
-                'or open a PGN below. Click a game to analyse it.',
-                style: theme.textTheme.bodySmall?.copyWith(color: p.muted),
-              ),
-            ],
-          ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(12, 12, 12, 10),
+          child: GameLoader(),
         ),
         Divider(height: 1, color: p.border),
         const Expanded(child: OnlineGameList()),

@@ -16,6 +16,7 @@ import 'analysis_controller.dart';
 import 'analysis_panels.dart';
 import 'board/chess_board.dart';
 import 'board/eval_bar.dart';
+import 'game_loader.dart';
 import 'games_screen.dart' show editGameDetails;
 import 'import_export.dart';
 import 'move_text.dart';

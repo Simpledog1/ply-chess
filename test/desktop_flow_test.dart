@@ -130,7 +130,15 @@ void main() {
     );
     await tester.pump();
 
-    // 1. Choose Lichess and enter the username.
+    // 1. Choose Lichess and enter the username, in the Game Analysis panel
+    // to the right of the board (not the top bar).
+    final boardRect = tester.getRect(find.byType(ChessBoard));
+    final loadRect = tester.getRect(find.text('Load games'));
+    expect(loadRect.left, greaterThan(boardRect.right));
+    expect(
+      loadRect.top,
+      greaterThan(tester.getRect(find.text('Game Analysis')).bottom),
+    );
     await tester.tap(find.text('Lichess'));
     await tester.pump();
     await tester.enterText(find.byType(TextField).first, 'Ply_Tester');
