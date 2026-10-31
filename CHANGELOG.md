@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.3.0 — Board left, Game Analysis panel right
+
+### Changed
+- **New desktop layout**: the board takes the left side and grows with the
+  window (player names and ratings above and below it); everything else
+  lives in one **Game Analysis** panel on the right: a tool row (your
+  games, analyse / deeper review / stop, flip, settings, share, save,
+  more), a **Report | Analysis** switch, and the move buttons at the bottom.
+  The separate games column and the controls under the board are gone.
+- **Report**: winning-chances graph (follows the shown move, click to
+  jump), each player's accuracy, a classification table per player (click
+  a count to go to that player's next move of that kind), key moments and
+  learning points.
+- **Analysis**: the move card, a new **Best for … now** row (Stockfish's
+  move and line for the position on the board, and how the game's move
+  compared), the live engine and the move list with the what-if line.
+- **Your games** (the back arrow): recent games plus Paste PGN, Open PGN and
+  FEN. Loading games shows it; opening a game shows its report; a what-if
+  move shows the Analysis view.
+- The top bar hides its tagline on windows narrower than 1280 px so the
+  section tabs stay visible.
+
 ## 1.2.1 — What-if line in the move list, sharper board
 
 ### Changed

@@ -7,7 +7,9 @@ or Chess.com, type a username, open one of the recent games, and let
 Stockfish 19, running on your own PC, find the mistakes, the better moves and
 what to learn from them. No account, no subscription, no cloud.
 
-![Ply on Windows: recent games, the board, the rating of the shown move, the moves and the game review on one screen](docs/screenshots/desktop_analyze.png)
+![Ply on Windows: the board on the left and the Game Analysis report on the right](docs/screenshots/desktop_report.png)
+
+![The Analysis view: the rating of the shown move, the best move now, and the moves](docs/screenshots/desktop_analyze.png)
 
 ![Trying your own move: Ply checks it with Stockfish and labels it as a what-if](docs/screenshots/desktop_whatif.png)
 
@@ -17,8 +19,8 @@ Stockfish 19 analysis (`test/render_screens_test.dart`). The game is Morphy's
 
 ## Install on Windows
 
-1. Download `Ply-Setup-1.2.1.exe` (or the portable
-   `Ply-1.2.1-windows-x64-portable.zip`).
+1. Download `Ply-Setup-1.3.0.exe` (or the portable
+   `Ply-1.3.0-windows-x64-portable.zip`).
 2. Run the installer. It installs for your user only, needs no administrator
    rights, adds Ply to the Start menu and optionally to the desktop.
    *Portable zip:* unzip anywhere and run `Ply\Ply.exe`.
@@ -36,43 +38,55 @@ them first in Ply (Settings → Profiles & privacy) or remove that folder.
 
 ## Using Ply
 
+The window has two parts: **the board** on the left, as large as the window
+allows, with each player's name and rating above and below it; and the
+**Game Analysis** panel on the right. The panel has a row of tools (your
+games, analyse, flip, settings, share, save, more), a **Report | Analysis**
+switch, and the move buttons at the bottom.
+
 1. **Choose the site** (Lichess or Chess.com) in the top bar and **type a
-   username**, then press Enter or **Load games**. Recent public games
-   appear on the left, newest first; **Load more** fetches older ones.
-   Usernames you used before are suggested as you type.
+   username**, then press Enter or **Load games**. The panel shows the
+   recent public games, newest first; **Load more** fetches older ones.
+   Usernames you used before are suggested as you type. The back arrow in
+   the panel returns to this list at any time; Paste PGN, Open PGN and FEN
+   are at its bottom.
 2. **Click a game.** The board turns to your side when the username played
-   in it.
+   in it, and the panel shows the game's **Report**.
 3. Press **Analyse game**. Stockfish checks every position at the same depth
    (14 by default: a few seconds to a minute on a typical PC). You can keep
    browsing while it works; results appear as they come in.
-4. Everything stays on one screen, next to the board:
-   - **The move card** rates the shown move (Best, Excellent, Good,
-     Inaccuracy, Mistake, Blunder…) in plain words, with the evaluation
-     before → after, Stockfish's move (**Show line** plays it out on the
-     board) and what follows. It updates as you step through the game.
-   - **The move list** marks inaccuracies, mistakes, blunders and standout
-     moves with their symbol (`?!`, `?`, `??`, `!`, `!!`); hover for the
-     rating, click to go there.
-   - **Game review** (collapsible, under the moves): result, accuracy
-     estimate and error counts per side, a winning-chances graph, the key
-     moments, moves worth recognising and **learning points** (missed
-     tactics, hanging pieces, back-rank mates, missed defences…). Click any
-     of them to jump to that position; the bulb button goes to the position
-     before a mistake so you can look for the better move. **Deeper review**
-     re-runs at depth 20 when you have time.
-5. **Try your own moves.** Move a piece on the board of a loaded game and
-   Ply starts a **what-if line**: the game itself and its review stay
-   untouched. The move card shows "Checking your move…" at once (with
-   Stockfish's preferred move when known), then the rating, labelled
-   *Your what-if move*. The line appears in the move list, in an amber
-   block right under the game move it branches from; click any of its moves
-   to show that position. Keep playing to continue the line; **Undo**
-   (Backspace) takes the last move back, **Back to game** (Esc) returns to
-   where you left the game.
-6. Close the window when you are done.
+4. **Report** summarises the game:
+   - a **winning-chances graph**: the line marks the shown move, dots mark
+     inaccuracies, mistakes and blunders, and clicking jumps to that move;
+   - each player's **accuracy** (White on the light cell, Black on the dark);
+   - a **classification table** with each player's count of Brilliant,
+     Critical, Best, Excellent, Good, Inaccuracy, Mistake, Blunder, Theory
+     (and Forced, when it occurred); click a count to go to that player's
+     next move of that kind;
+   - **key moments**, moves worth recognising and **learning points**
+     (missed tactics, hanging pieces, back-rank mates, missed defences…),
+     each linked to its position. The refresh tool runs a **deeper review**
+     at depth 20 when you have time.
+5. **Analysis** works move by move:
+   - **the move card** rates the shown move in plain words, with the
+     evaluation before → after, Stockfish's move (**Show line** plays it out
+     on the board) and what follows;
+   - **Best for … now** gives Stockfish's move and line for the position on
+     the board, and how the game's own move compared;
+   - the **live engine** switch and **the move list**, which marks
+     inaccuracies, mistakes, blunders and standout moves with their symbol
+     (`?!`, `?`, `??`, `!`, `!!`).
+6. **Try your own moves.** Move a piece on the board of a loaded game and
+   Ply starts a **what-if line** (the panel switches to Analysis): the game
+   itself, its report and its graph stay untouched. The move card shows
+   "Checking your move…" at once, then the rating, labelled *Your what-if
+   move*. The line appears in the move list, in an amber block right under
+   the game move it branches from; click any of its moves to show that
+   position. **Undo** (Backspace) takes the last move back, **Back to game**
+   (Esc) returns to where you left the game.
+7. Close the window when you are done.
 
-You can also paste a PGN, open a `.pgn` file or load a FEN (buttons under the
-game list), and share or export the analysed game as PGN.
+You can also share or export the analysed game as PGN (share tool).
 
 On a new board or a FEN position (no moves yet) the board edits the game
 itself, and each move you play is checked the same way. Once you analyse
@@ -82,7 +96,7 @@ it, further moves become what-ifs.
 F flip the board · Space play through the game · E engine on/off ·
 Backspace take back a what-if move · Esc back to the game.
 
-Live engine analysis of the current position (the **Engine** switch) shows
+Live engine analysis of the current position (the **Live engine** switch) shows
 the evaluation, up to five lines and suggestion arrows. Depth, number of
 lines, time limit and arrows are in the gear (Analysis Settings).
 
@@ -225,7 +239,7 @@ Installer (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)):
 ISCC.exe installer\ply.iss
 ```
 
-Output: `build\installer\Ply-Setup-1.2.1.exe`.
+Output: `build\installer\Ply-Setup-1.3.0.exe`.
 
 **Android** (arm64, Android 10+): `flutter build apk --release
 --target-platform android-arm64`; Gradle downloads and verifies the official

@@ -3,7 +3,7 @@
 ; Then:                 ISCC.exe installer\ply.iss
 ; Output:               build\installer\Ply-Setup-<version>.exe
 
-#define AppVersion "1.2.1"
+#define AppVersion "1.3.0"
 
 [Setup]
 ; Keep this AppId fixed so new versions upgrade the existing install.
