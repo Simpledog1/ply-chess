@@ -259,7 +259,11 @@ class UciEngine {
       s.onUpdate?.call(s.result());
     } else if (line.startsWith('bestmove')) {
       final parts = line.split(' ');
-      final move = parts.length > 1 && parts[1] != '(none)' ? parts[1] : null;
+      // "(none)" and the null move "0000" both mean there is no move.
+      final move =
+          parts.length > 1 && parts[1] != '(none)' && parts[1] != '0000'
+          ? parts[1]
+          : null;
       _active = null;
       s.done.complete(s.result(bestMove: move, finished: true));
     }

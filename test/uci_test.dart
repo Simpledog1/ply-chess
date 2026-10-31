@@ -13,6 +13,7 @@ class FakeEngine implements EngineTransport {
   final sent = <String>[];
   List<String> searchOutput = [];
   bool holdSearch = false;
+  String bestLine = 'bestmove e2e4 ponder e7e5';
 
   @override
   Stream<String> get lines => _out.stream;
@@ -31,7 +32,7 @@ class FakeEngine implements EngineTransport {
         emit('readyok');
       } else if (c.startsWith('go')) {
         searchOutput.forEach(emit);
-        if (!holdSearch) emit('bestmove e2e4 ponder e7e5');
+        if (!holdSearch) emit(bestLine);
       } else if (c == 'stop' && holdSearch) {
         emit('bestmove d2d4');
       }
@@ -253,5 +254,16 @@ void main() {
         expect(Eval.fromJson(e.toJson()), e);
       }
     });
+  });
+
+  test('"(none)" and the null move 0000 mean no best move', () async {
+    final fake = FakeEngine();
+    final e = UciEngine(fake);
+    await e.init();
+    for (final line in ['bestmove (none)', 'bestmove 0000']) {
+      fake.bestLine = line;
+      final r = await e.search(fen: Chess.initial.fen, turn: Side.white);
+      expect(r.bestMove, isNull, reason: line);
+    }
   });
 }

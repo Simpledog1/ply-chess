@@ -235,7 +235,9 @@ class _BoardArea extends StatelessWidget {
               ? firsts
               : firsts.take(1);
           for (final (i, u) in shown.indexed) {
-            if (u == null || u.length < 4) continue;
+            if (u == null || !RegExp(r'^[a-h][1-8][a-h][1-8]').hasMatch(u)) {
+              continue;
+            }
             arrows.add(
               BoardArrow(
                 Square.fromName(u.substring(0, 2)),
