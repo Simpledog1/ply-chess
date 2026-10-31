@@ -206,6 +206,9 @@ void main() {
     // A what-if move, checked by Stockfish in the background.
     services.analysis.goTo(18);
     services.analysis.userMove(Move.parse('c4b5')!);
+    services.analysis.userMove(Move.parse('c6b5')!);
+    services.analysis.userMove(Move.parse('c3b5')!);
+    services.analysis.goTo(19);
     for (var i = 0; i < 40 && services.analysis.lastMoveReview == null; i++) {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 250)),
@@ -221,6 +224,12 @@ void main() {
     tester.view.physicalSize = const Size(1920, 1080);
     services.analysis.goTo(31);
     await shot('desktop_1920');
+    // Windows display scaling: the board must stay sharp.
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.25;
+    await shot('desktop_125');
+    tester.view.devicePixelRatio = 1.5;
+    await shot('desktop_150');
     dir.deleteSync(recursive: true);
   }, skip: skip != null);
 }

@@ -9,7 +9,6 @@ class _DesktopLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final a = watchAnalysis(context);
     final p = PlyPalette.of(context);
     final roomy = width >= 1400;
     return Padding(
@@ -33,10 +32,6 @@ class _DesktopLayout extends StatelessWidget {
                         Center(child: _BoardArea(maxHeight: c.maxHeight)),
                   ),
                 ),
-                if (a.variation != null) ...[
-                  const SizedBox(height: 8),
-                  const _WhatIfBar(),
-                ],
                 const SizedBox(height: 8),
                 Container(
                   decoration: p.panelBox(radius: 10),
@@ -125,7 +120,7 @@ class _SidePanel extends StatefulWidget {
 
 class _SidePanelState extends State<_SidePanel> {
   final _currentKey = GlobalKey();
-  int _lastPly = -1;
+  String _lastShown = '';
 
   /// Null until the user toggles it: open by default on taller windows.
   bool? _reviewOpenChoice;
@@ -133,8 +128,10 @@ class _SidePanelState extends State<_SidePanel> {
   @override
   Widget build(BuildContext context) {
     final a = watchAnalysis(context);
-    if (a.ply != _lastPly) {
-      _lastPly = a.ply;
+    // Scroll the shown move (game or what-if) into view when it changes.
+    final shown = '${a.ply} ${a.onWhatIf} ${a.variation?.length}';
+    if (shown != _lastShown) {
+      _lastShown = shown;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final ctx = _currentKey.currentContext;
         if (ctx != null) {

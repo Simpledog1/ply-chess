@@ -435,10 +435,13 @@ class _Pill extends StatelessWidget {
   }
 }
 
-/// Shown while the board is on moves the user tried: the moves, undo, and
-/// the way back to the game.
-class _WhatIfBar extends StatelessWidget {
-  const _WhatIfBar();
+/// The what-if line, shown inside the move list right under the game move
+/// it branches from: its moves (click to show one), undo, and the way back
+/// to the game. It wraps, so a long line grows the scrollable list rather
+/// than the window.
+class _WhatIfBlock extends StatelessWidget {
+  const _WhatIfBlock({required this.currentKey});
+  final GlobalKey currentKey;
 
   @override
   Widget build(BuildContext context) {
@@ -446,49 +449,53 @@ class _WhatIfBar extends StatelessWidget {
     final v = a.variation;
     if (v == null) return const SizedBox.shrink();
     final theme = Theme.of(context);
-    final p = PlyPalette.of(context);
+
     final amber = classColor(MoveClass.inaccuracy);
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      margin: const EdgeInsets.fromLTRB(28, 4, 2, 6),
+      padding: const EdgeInsets.fromLTRB(10, 4, 4, 8),
       decoration: BoxDecoration(
-        color: amber.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: amber.withValues(alpha: 0.4)),
+        color: amber.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(8),
+        border: Border(left: BorderSide(color: amber, width: 3)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.alt_route, size: 20, color: amber),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'What-if line from move ${_moveNo(v.positionAt(a.branch)).trim()}'
-                  ' · the game itself is unchanged',
-                  style: theme.textTheme.labelMedium?.copyWith(color: p.muted),
+          Row(
+            children: [
+              Icon(Icons.alt_route, size: 16, color: amber),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'What-if line',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(color: amber),
                 ),
-                const SizedBox(height: 2),
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    for (var i = a.branch; i < v.length; i++)
-                      _WhatIfMove(index: i),
-                  ],
-                ),
-              ],
-            ),
+              ),
+              IconButton(
+                tooltip: 'Take back the last what-if move (Backspace)',
+                visualDensity: VisualDensity.compact,
+                iconSize: 18,
+                onPressed: a.undoWhatIf,
+                icon: const Icon(Icons.undo),
+              ),
+              TextButton.icon(
+                onPressed: a.backToGame,
+                icon: const Icon(Icons.keyboard_return, size: 16),
+                label: const Text('Back to game'),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Take back the last what-if move (Backspace)',
-            onPressed: a.undoWhatIf,
-            icon: const Icon(Icons.undo),
-          ),
-          const SizedBox(width: 4),
-          FilledButton.tonalIcon(
-            onPressed: a.backToGame,
-            icon: const Icon(Icons.keyboard_return, size: 18),
-            label: const Text('Back to game'),
+          Wrap(
+            spacing: 2,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              for (var i = a.branch; i < v.length; i++)
+                _WhatIfMove(index: i, currentKey: currentKey),
+            ],
           ),
         ],
       ),
@@ -497,8 +504,9 @@ class _WhatIfBar extends StatelessWidget {
 }
 
 class _WhatIfMove extends StatelessWidget {
-  const _WhatIfMove({required this.index});
+  const _WhatIfMove({required this.index, required this.currentKey});
   final int index;
+  final GlobalKey currentKey;
 
   @override
   Widget build(BuildContext context) {
@@ -510,27 +518,33 @@ class _WhatIfMove extends StatelessWidget {
     final current = a.ply == index + 1;
     final first = index == a.branch;
     return Semantics(
+      button: true,
       selected: current,
-      label: m?.cls.label,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6),
-        onTap: () => a.goTo(index + 1),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-          decoration: current
-              ? BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(6),
-                )
-              : null,
-          child: MoveText(
-            v.plies[index].san,
-            simple: a.settings.simpleNotation,
-            prefix: before.turn == Side.white || first ? _moveNo(before) : '',
-            suffix: m == null ? '' : classSymbol(m.cls),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: current ? FontWeight.w700 : null,
-              color: m != null && m.cls.isError ? classColor(m.cls) : null,
+      label: m == null ? 'What-if move' : 'What-if move, ${m.cls.label}',
+      child: Tooltip(
+        message: m == null ? 'Not rated yet' : m.cls.label,
+        child: InkWell(
+          key: current ? currentKey : null,
+          borderRadius: BorderRadius.circular(6),
+          onTap: () => a.goTo(index + 1),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+            decoration: current
+                ? BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(6),
+                  )
+                : null,
+            child: MoveText(
+              v.plies[index].san,
+              simple: a.settings.simpleNotation,
+              prefix: before.turn == Side.white || first ? _moveNo(before) : '',
+              suffix: m == null ? '' : classSymbol(m.cls),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontStyle: FontStyle.italic,
+                fontWeight: current ? FontWeight.w700 : null,
+                color: m != null && m.cls.isError ? classColor(m.cls) : null,
+              ),
             ),
           ),
         ),

@@ -17,6 +17,7 @@ import 'package:ply/online/online_games.dart';
 import 'package:ply/storage/game_store.dart';
 import 'package:ply/storage/settings.dart';
 import 'package:ply/ui/analysis_controller.dart';
+import 'package:ply/ui/board/chess_board.dart';
 import 'package:ply/ui/services.dart';
 
 const pgn = '''
@@ -60,7 +61,9 @@ class ScriptedEngine implements EngineTransport {
         final m = c.split(' moves ');
         _ply = m.length > 1 ? m[1].trim().split(' ').length : 0;
       } else if (c.startsWith('go')) {
-        final (score, best) = script[_ply];
+        final (score, best) = _ply < script.length
+            ? script[_ply]
+            : ('cp 0', '0000');
         _out
           ..add('info depth 12 multipv 1 score $score pv $best')
           ..add('bestmove $best');
@@ -181,22 +184,47 @@ void main() {
     expect(analysis.lastMoveReview!.san, 'Bc4');
     expect(find.text('This allows a forced checkmate.'), findsNothing);
 
-    // 7. A what-if move is labelled as such, rated in the background, and
-    // the way back leaves the game and its review as they were.
+    // 7. What-if moves are labelled as such, rated in the background, shown
+    // in the right panel's move list (not under the board), and can be
+    // stepped through; the way back leaves the game and its review intact.
+    final gameBefore = analysis.game;
     analysis.userMove(Move.parse('g7g6')!);
     await tester.pump();
     expect(find.text('Your what-if move'), findsOneWidget);
-    expect(find.text('Back to game'), findsOneWidget);
+    expect(find.text('What-if line'), findsOneWidget);
     for (var i = 0; i < 20 && analysis.lastMoveReview == null; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
     expect(analysis.lastMoveReview!.san, 'g6');
-    expect(analysis.game.length, 7);
+    analysis.userMove(Move.parse('h5f3')!);
+    analysis.userMove(Move.parse('f8g7')!);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(analysis.variation!.plies.skip(5).map((p) => p.san), [
+      'g6',
+      'Qf3',
+      'Bg7',
+    ]);
+    final board = tester.getRect(find.byType(ChessBoard));
+    final back = tester.getRect(find.text('Back to game'));
+    expect(back.left, greaterThan(board.right)); // right-hand panel
+    expect(back.top, lessThan(board.bottom)); // not below the board
+    // Clicking a what-if move shows its position.
+    final qf3 = find.textContaining('f3', findRichText: true).last;
+    await tester.ensureVisible(qf3);
+    await tester.tap(qf3);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(analysis.ply, 7);
+    expect(analysis.position.fen, analysis.variation!.positionAt(7).fen);
+    expect(analysis.onWhatIf, isTrue);
+    await tester.ensureVisible(find.text('Back to game'));
+    await tester.pump();
     await tester.tap(find.text('Back to game'));
     await tester.pump(const Duration(milliseconds: 200));
     expect(analysis.variation, isNull);
     expect(analysis.ply, 5);
+    expect(analysis.game, same(gameBefore));
     expect(analysis.review!.matches(analysis.game), isTrue);
+    expect(find.text('What-if line'), findsNothing);
 
     // 8. Closing the app shuts the engine down.
     await tester.runAsync(() => engine.engine.then((e) => e.dispose()));

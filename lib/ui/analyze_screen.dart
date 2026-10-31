@@ -484,10 +484,6 @@ class _PanelState extends State<_Panel> {
               const SizedBox(height: 8),
               const _AnalyseButton(),
               const SizedBox(height: 8),
-              if (a.variation != null) ...[
-                const _WhatIfBar(),
-                const SizedBox(height: 8),
-              ],
               KeyedSubtree(key: _feedbackKey, child: const _MoveFeedback()),
               const SizedBox(height: 8),
               const _EnginePanel(),
@@ -1076,7 +1072,7 @@ class _MoveList extends StatelessWidget {
         ],
       );
       final box = Container(
-        key: current ? currentKey : null,
+        key: current && !a.onWhatIf ? currentKey : null,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: current
             ? BoxDecoration(
@@ -1111,6 +1107,9 @@ class _MoveList extends StatelessWidget {
     final rows = <Widget>[];
     // A game from a position with Black to move starts with "1… e5".
     final offset = g.initial.turn == Side.black ? 1 : 0;
+    if (a.variation != null && a.branch == 0) {
+      rows.add(_WhatIfBlock(currentKey: currentKey));
+    }
     for (var r = 0; r * 2 - offset < g.length; r++) {
       final w = r * 2 - offset, b = w + 1;
       rows.add(
@@ -1134,6 +1133,11 @@ class _MoveList extends StatelessWidget {
           ),
         ),
       );
+      if (a.variation != null &&
+          a.branch > 0 &&
+          (a.branch - 1 == w || a.branch - 1 == b)) {
+        rows.add(_WhatIfBlock(currentKey: currentKey));
+      }
     }
     final result = g.result;
     if (result != '*') {
