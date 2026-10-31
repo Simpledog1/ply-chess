@@ -62,16 +62,20 @@ class _DesktopTopBarState extends State<DesktopTopBar> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  'Every move teaches.',
-                  maxLines: 1,
-                  overflow: TextOverflow.fade,
-                  softWrap: false,
-                  style: theme.textTheme.bodySmall?.copyWith(color: p.muted),
+              // The tagline gives way on narrow windows so all section tabs
+              // stay visible.
+              if (MediaQuery.sizeOf(context).width >= 1280) ...[
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Every move teaches.',
+                    maxLines: 1,
+                    overflow: TextOverflow.fade,
+                    softWrap: false,
+                    style: theme.textTheme.bodySmall?.copyWith(color: p.muted),
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(width: 16),
               SegmentedButton<ChessSite>(
                 showSelectedIcon: false,

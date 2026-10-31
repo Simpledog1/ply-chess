@@ -556,7 +556,11 @@ class _WhatIfMove extends StatelessWidget {
 /// The game review, inline: summary, key moments, good moves and learning
 /// points. Every item jumps to its position on the board.
 class _GameReview extends StatelessWidget {
-  const _GameReview();
+  const _GameReview({this.summary = true});
+
+  /// Show the result, per-side tiles and graph (the desktop Report view
+  /// shows its own versions of these).
+  final bool summary;
 
   @override
   Widget build(BuildContext context) {
@@ -637,41 +641,43 @@ class _GameReview extends StatelessWidget {
               ),
             ),
           ),
-        if (outcome != null)
-          Text(
-            '$result · $outcome',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
+        if (summary) ...[
+          if (outcome != null)
+            Text(
+              '$result · $outcome',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              for (final s in Side.values) ...[
+                if (s == Side.black) const SizedBox(width: 8),
+                Expanded(
+                  child: _SideTile(
+                    name: who(s),
+                    summary: summarize(moves, s),
+                    isMe: me == s,
+                    hideCounts: hide,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text('Winning chances for White', style: muted),
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 64,
+            child: EvalGraph(
+              review: r,
+              moves: moves,
+              current: a.onWhatIf ? a.branch : a.ply,
+              onTap: a.goToGame,
             ),
           ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            for (final s in Side.values) ...[
-              if (s == Side.black) const SizedBox(width: 8),
-              Expanded(
-                child: _SideTile(
-                  name: who(s),
-                  summary: summarize(moves, s),
-                  isMe: me == s,
-                  hideCounts: hide,
-                ),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text('Winning chances for White', style: muted),
-        const SizedBox(height: 4),
-        SizedBox(
-          height: 64,
-          child: EvalGraph(
-            review: r,
-            moves: moves,
-            current: a.onWhatIf ? a.branch : a.ply,
-            onTap: a.goToGame,
-          ),
-        ),
+        ],
         if (!hide) ...[
           heading(
             'Key moments',

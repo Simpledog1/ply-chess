@@ -18,6 +18,7 @@ import 'package:ply/storage/game_store.dart';
 import 'package:ply/storage/settings.dart';
 import 'package:ply/ui/analysis_controller.dart';
 import 'package:ply/ui/board/chess_board.dart';
+import 'package:ply/ui/eval_graph.dart';
 import 'package:ply/ui/services.dart';
 
 const pgn = '''
@@ -160,25 +161,47 @@ void main() {
     expect(analysis.review!.complete, isTrue);
     expect(store.games, isEmpty); // local history is off by default
 
-    // 4. The review sits on the same screen as the board: no tabs.
+    // 4. The Report view sits next to the board: graph, accuracy, the
+    // classification table, key moments and learning points.
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.byType(Tab), findsNothing);
-    expect(find.text('Game review'), findsOneWidget);
+    expect(find.text('Game Analysis'), findsOneWidget);
+    expect(find.text('Accuracy'), findsOneWidget);
+    expect(find.byType(EvalGraph), findsOneWidget);
+    final report = find
+        .ancestor(of: find.text('Accuracy'), matching: find.byType(Scrollable))
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('Allowed a forced mate'),
+      150,
+      scrollable: report,
+    );
     expect(find.text('Key moments'), findsOneWidget);
     expect(find.text('Allowed a forced mate'), findsOneWidget);
 
-    // 5. Clicking the blunder in the review shows it on the board, with its
-    // rating in the move card.
-    final blunder = find.text('Blunder');
-    await tester.ensureVisible(blunder);
+    // 5. The graph follows navigation, and clicking it navigates.
+    await tester.scrollUntilVisible(
+      find.byType(EvalGraph),
+      -150,
+      scrollable: report,
+    );
+    analysis.goTo(3);
     await tester.pump();
-    await tester.tap(blunder);
+    expect(tester.widget<EvalGraph>(find.byType(EvalGraph)).current, 3);
+    final graph = tester.getRect(find.byType(EvalGraph));
+    await tester.tapAt(graph.centerRight - const Offset(2, 0));
+    await tester.pump();
+    expect(analysis.ply, 7);
+
+    // 6. Clicking Black's blunder count shows the blunder; the Analysis view
+    // rates it and updates as the user navigates.
+    await tester.tap(find.byTooltip('Show Ply_Tester\'s next blunder move'));
     await tester.pump(const Duration(milliseconds: 200));
     expect(analysis.ply, 6);
+    await tester.tap(find.text('Analysis'));
+    await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('Played in the game'), findsOneWidget);
     expect(find.text('This allows a forced checkmate.'), findsOneWidget);
-
-    // 6. Navigating updates the card for each move.
     analysis.goTo(5);
     await tester.pump(const Duration(milliseconds: 200));
     expect(analysis.lastMoveReview!.san, 'Bc4');

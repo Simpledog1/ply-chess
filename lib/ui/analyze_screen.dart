@@ -9,6 +9,7 @@ import '../analysis/lessons.dart';
 import '../analysis/review.dart';
 import '../chess/chess_game.dart';
 import '../engine/engine_service.dart';
+import '../online/games_browser.dart';
 import '../storage/game_store.dart';
 import '../storage/settings.dart';
 import 'analysis_controller.dart';

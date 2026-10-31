@@ -197,11 +197,13 @@ void main() {
     services.tab.value = 3;
     await shot('settings');
 
-    // Desktop (Windows) layout.
+    // Desktop (Windows) layout: board left, Game Analysis panel right.
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1;
     services.tab.value = 0;
     services.analysis.goTo(17);
+    await shot('desktop_report');
+    await tester.tap(find.text('Analysis'));
     await shot('desktop_analyze');
     // A what-if move, checked by Stockfish in the background.
     services.analysis.goTo(18);
@@ -217,15 +219,19 @@ void main() {
     }
     await shot('desktop_whatif');
     services.analysis.backToGame();
-    // Common laptop size.
-    tester.view.physicalSize = const Size(1366, 768);
+    await tester.tap(find.byTooltip('Your games and imports'));
+    await shot('desktop_games');
+    await tester.tap(find.text('Report'));
+    // Smallest desktop window and a common laptop size.
+    tester.view.physicalSize = const Size(1000, 640);
     services.analysis.goTo(12);
+    await shot('desktop_1000');
+    tester.view.physicalSize = const Size(1366, 768);
     await shot('desktop_1366');
     tester.view.physicalSize = const Size(1920, 1080);
     services.analysis.goTo(31);
     await shot('desktop_1920');
     // Windows display scaling: the board must stay sharp.
-    tester.view.physicalSize = const Size(1920, 1080);
     tester.view.devicePixelRatio = 1.25;
     await shot('desktop_125');
     tester.view.devicePixelRatio = 1.5;
