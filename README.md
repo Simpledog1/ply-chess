@@ -17,8 +17,8 @@ Stockfish 19 analysis (`test/render_screens_test.dart`). The game is Morphy's
 
 ## Install on Windows
 
-1. Download `Ply-Setup-1.2.0.exe` (or the portable
-   `Ply-1.2.0-windows-x64-portable.zip`).
+1. Download `Ply-Setup-1.2.1.exe` (or the portable
+   `Ply-1.2.1-windows-x64-portable.zip`).
 2. Run the installer. It installs for your user only, needs no administrator
    rights, adds Ply to the Start menu and optionally to the desktop.
    *Portable zip:* unzip anywhere and run `Ply\Ply.exe`.
@@ -64,7 +64,9 @@ them first in Ply (Settings → Profiles & privacy) or remove that folder.
    Ply starts a **what-if line**: the game itself and its review stay
    untouched. The move card shows "Checking your move…" at once (with
    Stockfish's preferred move when known), then the rating, labelled
-   *Your what-if move*. Keep playing to continue the line; **Undo**
+   *Your what-if move*. The line appears in the move list, in an amber
+   block right under the game move it branches from; click any of its moves
+   to show that position. Keep playing to continue the line; **Undo**
    (Backspace) takes the last move back, **Back to game** (Esc) returns to
    where you left the game.
 6. Close the window when you are done.
@@ -223,7 +225,7 @@ Installer (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)):
 ISCC.exe installer\ply.iss
 ```
 
-Output: `build\installer\Ply-Setup-1.2.0.exe`.
+Output: `build\installer\Ply-Setup-1.2.1.exe`.
 
 **Android** (arm64, Android 10+): `flutter build apk --release
 --target-platform android-arm64`; Gradle downloads and verifies the official

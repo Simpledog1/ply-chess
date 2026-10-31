@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.1 — What-if line in the move list, sharper board
+
+### Changed
+- The what-if line is shown inside the move list on the right, in an
+  amber block under the game move it branches from, with its own Undo and
+  Back to game. Its moves can be clicked to show their positions. The bar
+  under the board is gone.
+
+### Fixed
+- Blurry board and pieces: the board was sized and placed on fractional
+  pixels, so every square edge and piece outline was smeared across two
+  pixels (at every Windows display scaling). It now snaps to whole physical
+  pixels at any window size and scaling.
+- An engine reporting the null move `0000` as its best move no longer
+  breaks the board's suggestion arrow.
+
 ## 1.2.0 — One-screen analysis and move feedback
 
 ### Added

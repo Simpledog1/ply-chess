@@ -8,7 +8,7 @@ import 'games_screen.dart' show HistoryStatus, profileLabel;
 import 'import_export.dart' show snack;
 import 'services.dart';
 
-const appVersion = '1.2.0';
+const appVersion = '1.2.1';
 const tagline = 'Every move teaches.';
 
 class SettingsScreen extends StatelessWidget {
