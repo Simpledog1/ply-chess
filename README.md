@@ -19,8 +19,8 @@ Stockfish 19 analysis (`test/render_screens_test.dart`). The game is Morphy's
 
 ## Install on Windows
 
-1. Download `Ply-Setup-1.3.0.exe` (or the portable
-   `Ply-1.3.0-windows-x64-portable.zip`).
+1. Download `Ply-Setup-1.3.1.exe` (or the portable
+   `Ply-1.3.1-windows-x64-portable.zip`).
 2. Run the installer. It installs for your user only, needs no administrator
    rights, adds Ply to the Start menu and optionally to the desktop.
    *Portable zip:* unzip anywhere and run `Ply\Ply.exe`.
@@ -44,12 +44,12 @@ allows, with each player's name and rating above and below it; and the
 games, analyse, flip, settings, share, save, more), a **Report | Analysis**
 switch, and the move buttons at the bottom.
 
-1. **Choose the site** (Lichess or Chess.com) in the top bar and **type a
-   username**, then press Enter or **Load games**. The panel shows the
-   recent public games, newest first; **Load more** fetches older ones.
-   Usernames you used before are suggested as you type. The back arrow in
-   the panel returns to this list at any time; Paste PGN, Open PGN and FEN
-   are at its bottom.
+1. In the panel's **Your games** view (shown at start, and behind the back
+   arrow at any time), **choose the site** (Lichess or Chess.com), **type a
+   username** and press Enter or **Load games**. The recent public games
+   appear below, newest first; **Load more** fetches older ones. Usernames
+   you used before are suggested as you type. Paste PGN, Open PGN and FEN
+   are at the bottom of the same view.
 2. **Click a game.** The board turns to your side when the username played
    in it, and the panel shows the game's **Report**.
 3. Press **Analyse game**. Stockfish checks every position at the same depth
@@ -239,7 +239,7 @@ Installer (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)):
 ISCC.exe installer\ply.iss
 ```
 
-Output: `build\installer\Ply-Setup-1.3.0.exe`.
+Output: `build\installer\Ply-Setup-1.3.1.exe`.
 
 **Android** (arm64, Android 10+): `flutter build apk --release
 --target-platform android-arm64`; Gradle downloads and verifies the official

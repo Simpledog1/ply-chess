@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.1 — Game loading in the analysis panel
+
+### Changed
+- Site, username and **Load games** moved from the top bar into the Game
+  Analysis panel (Your games view), above the games list. The top bar now
+  holds only the Ply name and the section tabs, aligned to the right.
+
 ## 1.3.0 — Board left, Game Analysis panel right
 
 ### Changed
