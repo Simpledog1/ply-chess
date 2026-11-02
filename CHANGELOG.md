@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.4.0 — Puzzle Training (Woodpecker method)
+
+### Added
+- **Training** section: tactics training with the Woodpecker method. Set up
+  once (optional rating and its source, collection size, wrong-move
+  behaviour, hints), calibrate with 12 adaptive puzzles (or skip), then
+  train a fixed collection of 50, 100 or 200 puzzles over three cycles.
+  Each cycle replays the same puzzles in a new, saved order that mixes
+  themes and difficulty; training resumes where it stopped after a
+  restart.
+- Solving screen with the board as the focus: the opponent's replies are
+  played for you, any checkmate counts, Retry or Reveal after a wrong move,
+  three hint levels, Reset, Solution, Skip, a timer, and after each puzzle
+  the idea, the full solution, time, mistakes and hints.
+- Dashboard, cycle results (cycles and themes compared) and collection
+  results (improvement, themes still hard, how the next collection
+  changes). Collection history stays available.
+- Personalised collections without any AI service: an estimated puzzle
+  level from calibration and first exposures, weak themes only with enough
+  evidence (70% general / 30% targeted), difficulty that moves with both
+  accuracy and speed, and new puzzles in each collection. Not enough
+  puzzles is explained, never hidden.
+- 7,938 puzzles from the CC0 Lichess puzzle database ship with Ply (offline
+  from the start); more can be downloaded from Lichess by theme or imported
+  from a Lichess puzzle CSV, each validated move by move.
+- Settings → Profiles & privacy: delete puzzle training data.
+- `docs/TRAINING.md` documents the design, the data files and the rules.
+
 ## 1.3.1 — Game loading in the analysis panel
 
 ### Changed

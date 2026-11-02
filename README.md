@@ -19,8 +19,8 @@ Stockfish 19 analysis (`test/render_screens_test.dart`). The game is Morphy's
 
 ## Install on Windows
 
-1. Download `Ply-Setup-1.3.1.exe` (or the portable
-   `Ply-1.3.1-windows-x64-portable.zip`).
+1. Download `Ply-Setup-1.4.0.exe` (or the portable
+   `Ply-1.4.0-windows-x64-portable.zip`).
 2. Run the installer. It installs for your user only, needs no administrator
    rights, adds Ply to the Start menu and optionally to the desktop.
    *Portable zip:* unzip anywhere and run `Ply\Ply.exe`.
@@ -100,6 +100,52 @@ Live engine analysis of the current position (the **Live engine** switch) shows
 the evaluation, up to five lines and suggestion arrows. Depth, number of
 lines, time limit and arrows are in the gear (Analysis Settings).
 
+## Puzzle Training (Woodpecker method)
+
+![Puzzle Training: solving a puzzle from the current collection](docs/screenshots/training_solved.png)
+
+The **Training** tab turns Ply into a tactics trainer based on the
+Woodpecker method: solve the same set of puzzles three times, so the
+patterns become automatic.
+
+1. **Set up** (once): optionally enter your rating and where it is from
+   (Lichess, Chess.com, FIDE, other), choose the collection size (50, 100 or
+   200 puzzles; 100 recommended), what happens after a wrong move (**let me
+   try again**, the default, or **show the solution**) and whether hints are
+   allowed.
+2. **Calibration**: 12 quick puzzles that adapt to your answers and give a
+   first estimate of your puzzle level (or skip it and start from your
+   rating).
+3. **Your collection**: Ply previews it first: the difficulty range, how
+   many puzzles are general and how many target weak themes (only once
+   enough results show them), and the themes inside. Puzzles are mixed:
+   themes and difficulty are interleaved, never easiest to hardest.
+4. **Three cycles**: solve the whole collection, then the same puzzles
+   again in a new order, twice. The dashboard shows the cycle, progress,
+   first-try accuracy, average time and puzzles you have provisionally
+   mastered. Close Ply at any time; **Continue training** resumes at the
+   same puzzle.
+5. **While solving**: the board is yours; Ply plays the opponent's replies.
+   **Hint** (theme, then the piece, then the move), **Reset**, **Solution**
+   and **Skip** are on the right. After each puzzle you see whether you
+   solved it first try, the tactical idea, the full solution, your time,
+   mistakes and hints.
+6. **Results** after every cycle compare cycles and themes. After the third
+   cycle Ply summarises what improved and what is still hard, explains how
+   the next collection changes (a little harder, the same, or easier, from
+   your first-try accuracy and speed), and builds it from new puzzles.
+   Earlier collections stay in the history.
+
+**Puzzles** come from the Lichess open puzzle database (CC0). Ply includes
+7,938 well-established puzzles from ratings 600 to 2800, so training works
+offline from the start. The cloud icon downloads more from Lichess (by
+theme, 100–500 at a time) or imports a decompressed Lichess puzzle CSV;
+every puzzle is checked move by move before it is added.
+
+Details for maintainers (data format, the recommendation rules and their
+numbers, rebuilding the puzzle pack) are in
+[docs/TRAINING.md](docs/TRAINING.md).
+
 ## Your data: profiles and local history
 
 - A **profile** is a site plus a username (`Lichess · magnus` and
@@ -119,8 +165,9 @@ lines, time limit and arrows are in the gear (Analysis Settings).
   removes that username and all its saved games; **Delete all local history**
   removes every saved game. Settings (preferences, usernames) and game records
   are kept in separate files.
-- Location: `%APPDATA%\Simpledog1\Ply` (`settings.json`, `ply_data.json`).
-  Nothing is written to the installation folder.
+- Location: `%APPDATA%\Simpledog1\Ply` (`settings.json`, `ply_data.json`,
+  and for Puzzle Training `training.json` and `puzzles.json`). Nothing is
+  written to the installation folder.
 
 **Privacy.** Ply has no accounts, no telemetry and no server. The only
 network requests go to the official Lichess and Chess.com public APIs, and
@@ -239,7 +286,7 @@ Installer (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)):
 ISCC.exe installer\ply.iss
 ```
 
-Output: `build\installer\Ply-Setup-1.3.1.exe`.
+Output: `build\installer\Ply-Setup-1.4.0.exe`.
 
 **Android** (arm64, Android 10+): `flutter build apk --release
 --target-platform android-arm64`; Gradle downloads and verifies the official
@@ -265,7 +312,10 @@ inline review, try a what-if move and return to the game, shut the engine
 down), and what-if behaviour: the game and review stay unchanged, undo,
 perspective of Black's moves, forced moves and mate scores, no rating
 without analysis, and stale engine results that cannot reach a newer
-position.
+position. Puzzle Training has its own tests (puzzle parsing and validation,
+the whole starter pack, the solver, collections, cycles, persistence,
+statistics, recommendations, downloads and a UI flow); see
+[docs/TRAINING.md](docs/TRAINING.md#tests).
 
 Optional checks, skipped unless enabled:
 
@@ -301,6 +351,10 @@ installer/     Inno Setup script
 - What-if lines are kept in memory only: they are not saved to history or
   exported, and only one line is kept at a time (playing a different move
   earlier replaces it).
+- Puzzle Training keeps its progress on this PC even when local history is
+  off (repetition needs it); delete it in Settings → Profiles & privacy. It
+  trains one local player, and does not use Stockfish or your game analysis
+  (yet).
 - Threefold repetition and the 50-move rule are not announced on the board,
   though the engine scores repetitions as draws.
 
