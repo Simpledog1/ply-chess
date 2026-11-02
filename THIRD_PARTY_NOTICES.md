@@ -48,6 +48,23 @@ license text of every bundled component.
   unmodified, in `assets/openings/`)
 - License: CC0 1.0 (public domain dedication)
 
+## Training puzzles
+
+- Source: the Lichess open puzzle database,
+  <https://database.lichess.org/#puzzles> (`lichess_db_puzzle.csv.zst`,
+  export of 2026-11-01, SHA-256
+  `7b0d235fa40cfd7fdb7df1fec56a96b3b6ee1496b32ed2eb05be90d0ebf94253`).
+- License: CC0 1.0 ("Database exports are released under the Creative
+  Commons CC0 license"), so the sample may be redistributed.
+- `assets/puzzles/lichess_starter.csv` holds 7,938 of its 6,193,530 puzzles,
+  unmodified rows (the OpeningTags and DailyDate columns are left empty),
+  chosen by `tool/build_puzzle_pack.js`: well-established puzzles (rating
+  deviation ≤ 80, popularity ≥ 85, at least 1,000 plays; slightly relaxed
+  from 2500 up) with at most five player moves, spread over 100-point
+  rating bands from 600 to 2800 and over tactical themes.
+- Puzzles downloaded in the app come from the Lichess puzzle API
+  (`lichess.org/api/puzzle/batch`), from the same database.
+
 ## Online services (optional)
 
 Loading games by username calls the public APIs of Chess.com
