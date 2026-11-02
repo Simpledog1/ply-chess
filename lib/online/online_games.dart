@@ -45,7 +45,8 @@ typedef HttpGet = Future<HttpReply> Function(Uri uri, String accept);
 const _agent = 'Ply/1.1 (personal chess analysis app)';
 const _timeout = Duration(seconds: 20);
 
-Future<HttpReply> _ioGet(Uri uri, String accept) async {
+/// The real HTTP GET (Ply user agent, 20 s timeouts). Tests pass fakes.
+Future<HttpReply> defaultHttpGet(Uri uri, String accept) async {
   final client = HttpClient()..connectionTimeout = _timeout;
   try {
     final req = await client.getUrl(uri).timeout(_timeout);
@@ -102,7 +103,7 @@ class OnlineGame {
 class GameFeed {
   GameFeed(this.site, String username, {HttpGet? get, this.pageSize = 20})
     : username = checkUsername(username),
-      _get = get ?? _ioGet;
+      _get = get ?? defaultHttpGet;
 
   final ChessSite site;
   final String username;

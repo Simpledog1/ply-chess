@@ -49,9 +49,7 @@ class Puzzle {
   ];
 
   /// The theme used to spread puzzles out when ordering a collection.
-  String get primaryTheme => motifs.isNotEmpty
-      ? motifs.first
-      : (themes.contains('mate') ? 'mate' : 'other');
+  String get primaryTheme => primaryThemeOf(themes);
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -145,6 +143,15 @@ class Puzzle {
 
   static List<String> _split(String s) =>
       s.trim().isEmpty ? const [] : s.trim().split(RegExp(r'\s+'));
+}
+
+/// The theme used to spread puzzles out: the first tactical motif, else
+/// 'mate' for mating puzzles, else 'other'.
+String primaryThemeOf(List<String> themes) {
+  for (final t in themes) {
+    if (!nonMotifThemes.contains(t)) return t;
+  }
+  return themes.contains('mate') ? 'mate' : 'other';
 }
 
 /// Lichess theme tags that describe the game phase, the length or the
