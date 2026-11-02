@@ -145,9 +145,46 @@ class Puzzle {
       s.trim().isEmpty ? const [] : s.trim().split(RegExp(r'\s+'));
 }
 
-/// The theme used to spread puzzles out: the first tactical motif, else
-/// 'mate' for mating puzzles, else 'other'.
+/// Tactical motifs from most to least telling, used to name a puzzle's
+/// main idea (Lichess lists themes alphabetically, which says nothing).
+const _motifPriority = [
+  'fork',
+  'pin',
+  'skewer',
+  'discoveredAttack',
+  'doubleCheck',
+  'deflection',
+  'attraction',
+  'clearance',
+  'interference',
+  'intermezzo',
+  'xRayAttack',
+  'capturingDefender',
+  'sacrifice',
+  'trappedPiece',
+  'hangingPiece',
+  'backRankMate',
+  'smotheredMate',
+  'defensiveMove',
+  'quietMove',
+  'zugzwang',
+  'promotion',
+  'underPromotion',
+  'advancedPawn',
+  'enPassant',
+  'castling',
+  'exposedKing',
+  'attackingF2F7',
+  'kingsideAttack',
+  'queensideAttack',
+];
+
+/// The theme used to spread puzzles out: the most telling tactical motif,
+/// else 'mate' for mating puzzles, else 'other'.
 String primaryThemeOf(List<String> themes) {
+  for (final t in _motifPriority) {
+    if (themes.contains(t)) return t;
+  }
   for (final t in themes) {
     if (!nonMotifThemes.contains(t)) return t;
   }

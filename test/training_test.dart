@@ -211,6 +211,19 @@ void main() {
       },
     );
 
+    test('back-to-back saves do not collide', () async {
+      final store = TrainingStore(dir);
+      final c = newCollection(plan(50).puzzles);
+      await store.addCollection(c);
+      await Future.wait([
+        for (final id in c.currentCycle!.order.take(10))
+          store.recordAttempt(c, attempt(c.puzzle(id)!)),
+      ]);
+      final again = TrainingStore(dir);
+      await again.load();
+      expect(again.active!.currentCycle!.done, 10);
+    });
+
     test('attempts must follow the cycle order', () async {
       final ps = plan(50).puzzles;
       final store = TrainingStore(dir);

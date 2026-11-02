@@ -408,7 +408,17 @@ class TrainingStore extends ChangeNotifier {
     return j;
   }
 
-  Future<void> _save() async {
+  Future<void> _queue = Future.value();
+
+  /// Saves run one at a time (overlapping writes would race on the temp
+  /// file); each writes the state as it is when it runs.
+  Future<void> _save() {
+    final next = _queue.then((_) => _write());
+    _queue = next.catchError((Object _) {});
+    return next;
+  }
+
+  Future<void> _write() async {
     await dir.create(recursive: true);
     final tmp = File('${_file.path}.tmp');
     await tmp.writeAsString(

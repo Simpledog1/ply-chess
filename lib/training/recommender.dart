@@ -270,18 +270,28 @@ Object buildCollection({
     }
   }
   final targetedCount = picked.length;
-  // General: round-robin over primary themes for variety.
-  final buckets = <String, List<Puzzle>>{};
-  for (final p in range) {
-    if (!picked.containsKey(p.id)) (buckets[p.primaryTheme] ??= []).add(p);
+  // General: the natural mix of the rating range, but no main theme above
+  // about 12% (at least 2 each), so the collection stays varied without
+  // over-weighting rare patterns.
+  final cap = math.max(2, (size * 0.12).ceil());
+  final perTheme = <String, int>{
+    for (final p in picked.values) p.primaryTheme: 0,
+  };
+  for (final p in picked.values) {
+    perTheme[p.primaryTheme] = perTheme[p.primaryTheme]! + 1;
   }
-  final lists = buckets.values.map((l) => l..shuffle(rng)).toList()
-    ..shuffle(rng);
-  while (picked.length < size && lists.any((l) => l.isNotEmpty)) {
-    for (final l in lists) {
-      if (l.isEmpty || picked.length >= size) continue;
-      final p = l.removeLast();
+  final rest = [
+    for (final p in range)
+      if (!picked.containsKey(p.id)) p,
+  ]..shuffle(rng);
+  for (final relax in [false, true]) {
+    for (final p in rest) {
+      if (picked.length >= size) break;
+      if (picked.containsKey(p.id)) continue;
+      final n = perTheme[p.primaryTheme] ?? 0;
+      if (!relax && n >= cap) continue;
       picked[p.id] = p;
+      perTheme[p.primaryTheme] = n + 1;
     }
   }
   return CollectionPlan(

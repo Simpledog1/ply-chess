@@ -197,7 +197,17 @@ class PuzzleCatalogue extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _save(Map<String, Puzzle> user, List<ImportRecord> log) async {
+  Future<void> _queue = Future.value();
+
+  /// Saves run one at a time (overlapping writes would race on the temp
+  /// file).
+  Future<void> _save(Map<String, Puzzle> user, List<ImportRecord> log) {
+    final next = _queue.then((_) => _write(user, log));
+    _queue = next.catchError((Object _) {});
+    return next;
+  }
+
+  Future<void> _write(Map<String, Puzzle> user, List<ImportRecord> log) async {
     await dir.create(recursive: true);
     final tmp = File('${_file.path}.tmp');
     await tmp.writeAsString(
