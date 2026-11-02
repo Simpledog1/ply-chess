@@ -387,7 +387,7 @@ class _ProfilesSection extends StatelessWidget {
     final s = Services.of(context);
     final st = s.settings;
     return ListenableBuilder(
-      listenable: s.store,
+      listenable: Listenable.merge([s.store, s.training]),
       builder: (context, _) {
         final counts = s.store.countsByProfile();
         final theme = Theme.of(context);
@@ -462,6 +462,31 @@ class _ProfilesSection extends StatelessWidget {
                 }
                 await s.store.deleteAll();
                 if (context.mounted) snack(context, 'Local history deleted');
+              },
+            ),
+            ListTile(
+              title: const Text('Delete puzzle training data'),
+              subtitle: Text(
+                'Training level, ${s.training.store.collections.length} '
+                'collection(s) and all puzzle attempts '
+                '(training.json). Downloaded puzzles are kept.',
+              ),
+              trailing: const Icon(Icons.delete_forever_outlined),
+              enabled:
+                  s.training.profile != null ||
+                  s.training.store.collections.isNotEmpty,
+              onTap: () async {
+                if (!await _confirm(
+                  context,
+                  'Delete puzzle training data?',
+                  'Removes your training level, every collection, cycle and '
+                      'puzzle attempt from this PC. This cannot be undone.',
+                )) {
+                  return;
+                }
+                s.training.closeSession();
+                await s.training.store.deleteAll();
+                if (context.mounted) snack(context, 'Training data deleted');
               },
             ),
             Padding(

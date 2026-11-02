@@ -20,6 +20,9 @@ import 'package:ply/ui/analysis_controller.dart';
 import 'package:ply/ui/board/chess_board.dart';
 import 'package:ply/ui/eval_graph.dart';
 import 'package:ply/ui/services.dart';
+import 'package:ply/training/puzzle_catalogue.dart';
+import 'package:ply/training/training_controller.dart';
+import 'package:ply/training/training_store.dart';
 
 const pgn = '''
 [Event "Rated Blitz game"]
@@ -124,6 +127,10 @@ void main() {
         engine: engine,
         analysis: analysis,
         browser: browser,
+        training: TrainingController(
+          catalogue: PuzzleCatalogue(dir),
+          store: TrainingStore(dir),
+        ),
         tab: ValueNotifier(0),
         child: const PlyApp(),
       ),

@@ -4,6 +4,7 @@ import '../engine/engine_service.dart';
 import '../online/games_browser.dart';
 import '../storage/game_store.dart';
 import '../storage/settings.dart';
+import '../training/training_controller.dart';
 import 'analysis_controller.dart';
 
 /// App-wide objects, available to every screen via [Services.of].
@@ -15,6 +16,7 @@ class Services extends InheritedWidget {
     required this.engine,
     required this.analysis,
     required this.browser,
+    required this.training,
     required this.tab,
     required super.child,
   });
@@ -27,7 +29,10 @@ class Services extends InheritedWidget {
   /// Recent games of the selected Lichess / Chess.com profile.
   final GamesBrowser browser;
 
-  /// Selected bottom-navigation tab (0 Analyze, 1 Games, 2 Insights, 3 Settings).
+  /// Puzzle Training (Woodpecker method).
+  final TrainingController training;
+
+  /// Selected bottom-navigation tab (0 Analyze, 1 Training, 2 History, 3 Insights, 4 Settings).
   final ValueNotifier<int> tab;
 
   static Services of(BuildContext context) =>

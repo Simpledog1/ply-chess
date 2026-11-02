@@ -20,6 +20,10 @@ import 'ui/insights_screen.dart';
 import 'ui/services.dart';
 import 'ui/settings_screen.dart';
 import 'ui/theme.dart';
+import 'ui/training/training_screen.dart';
+import 'training/puzzle_catalogue.dart';
+import 'training/training_controller.dart';
+import 'training/training_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +36,12 @@ Future<void> main() async {
   await settings.load();
   final store = GameStore(dir);
   await store.load();
+  // Puzzle training: progress loads now; the puzzle library (starter pack
+  // plus downloads) parses in the background.
+  final trainingStore = TrainingStore(dir);
+  await trainingStore.load();
+  final catalogue = PuzzleCatalogue(dir);
+  unawaited(catalogue.load());
   final engine = EngineService(
     threads: settings.threads,
     hashMb: settings.hashMb,
@@ -52,6 +62,7 @@ Future<void> main() async {
       engine: engine,
       analysis: analysis,
       browser: GamesBrowser(settings: settings),
+      training: TrainingController(catalogue: catalogue, store: trainingStore),
       tab: ValueNotifier(0),
       child: const PlyApp(),
     ),
@@ -122,12 +133,14 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   static const _pages = [
     AnalyzeScreen(),
+    TrainingScreen(),
     GamesScreen(),
     InsightsScreen(),
     SettingsScreen(),
   ];
   static const _dest = [
     (Icons.grid_view_outlined, Icons.grid_view_rounded, 'Analyze'),
+    (Icons.extension_outlined, Icons.extension, 'Training'),
     (Icons.history, Icons.history, 'History'),
     (Icons.insights_outlined, Icons.insights, 'Insights'),
     (Icons.tune_outlined, Icons.tune, 'Settings'),

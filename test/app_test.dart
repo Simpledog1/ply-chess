@@ -10,6 +10,9 @@ import 'package:ply/storage/settings.dart';
 import 'package:ply/ui/analysis_controller.dart';
 import 'package:ply/ui/board/chess_board.dart';
 import 'package:ply/ui/services.dart';
+import 'package:ply/training/puzzle_catalogue.dart';
+import 'package:ply/training/training_controller.dart';
+import 'package:ply/training/training_store.dart';
 
 void main() {
   late Directory dir;
@@ -30,6 +33,10 @@ void main() {
         settings: settings,
       ),
       browser: GamesBrowser(settings: settings),
+      training: TrainingController(
+        catalogue: PuzzleCatalogue(dir),
+        store: TrainingStore(dir),
+      ),
       tab: ValueNotifier(0),
       child: const PlyApp(),
     );
@@ -56,13 +63,19 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('starts on Analyze with a full board and all four sections', (
+  testWidgets('starts on Analyze with a full board and all sections', (
     tester,
   ) async {
     await pumpApp(tester);
     expect(find.byType(ChessBoard), findsOneWidget);
     expect(find.byType(PieceImage), findsNWidgets(32));
-    for (final label in ['Analyze', 'History', 'Insights', 'Settings']) {
+    for (final label in [
+      'Analyze',
+      'Training',
+      'History',
+      'Insights',
+      'Settings',
+    ]) {
       expect(find.text(label), findsOneWidget);
     }
   });

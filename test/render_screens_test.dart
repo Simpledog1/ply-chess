@@ -23,6 +23,10 @@ import 'package:ply/storage/settings.dart';
 import 'package:ply/ui/analysis_controller.dart';
 import 'package:ply/ui/board/chess_board.dart';
 import 'package:ply/ui/services.dart';
+import 'package:ply/training/puzzle_catalogue.dart';
+import 'package:ply/training/training_controller.dart';
+import 'package:ply/training/recommender.dart';
+import 'package:ply/training/training_store.dart';
 
 const opera = '''
 [Event "Paris"]
@@ -138,6 +142,10 @@ void main() {
                   ),
                 ),
         ),
+        training: TrainingController(
+          catalogue: PuzzleCatalogue(dir),
+          store: TrainingStore(dir),
+        ),
         tab: ValueNotifier(0),
         child: RepaintBoundary(key: key, child: const PlyApp()),
       );
@@ -190,11 +198,11 @@ void main() {
     services.settings.update((s) => s.themeMode = ThemeMode.light);
     await shot('analyze_light');
     services.settings.update((s) => s.themeMode = ThemeMode.dark);
-    services.tab.value = 1;
-    await shot('games');
     services.tab.value = 2;
-    await shot('insights');
+    await shot('games');
     services.tab.value = 3;
+    await shot('insights');
+    services.tab.value = 4;
     await shot('settings');
 
     // Desktop (Windows) layout: board left, Game Analysis panel right.
@@ -236,6 +244,48 @@ void main() {
     await shot('desktop_125');
     tester.view.devicePixelRatio = 1.5;
     await shot('desktop_150');
+
+    // Puzzle Training.
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1440, 900);
+    final t = services.training;
+    services.tab.value = 1;
+    await tester.runAsync(
+      () => t.catalogue.load(
+        starterCsv: File('assets/puzzles/lichess_starter.csv')
+            .readAsStringSync(),
+      ),
+    );
+    await shot('training_setup');
+    await tester.runAsync(() async {
+      await t.createProfile(source: RatingSource.lichess, rating: 1600);
+      await t.skipCalibration();
+    });
+    await shot('training_plan');
+    await tester.runAsync(
+      () =>
+          t.createCollection(t.planCollection(100, seed: 5) as CollectionPlan),
+    );
+    t.nextInCycle();
+    await shot('training_solve');
+    final s = t.session!;
+    while (!s.over) {
+      // On the real clock: the final move saves the attempt to disk.
+      await tester.runAsync(() async {
+        if (!s.solver.replyPending) {
+          t.play(Move.parse(s.puzzle.moves[s.solver.index])!);
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    await shot('training_solved');
+    t.closeSession();
+    await shot('training_dashboard');
+    // Let the last saves finish before the folder is deleted.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
     dir.deleteSync(recursive: true);
   }, skip: skip != null);
 }
