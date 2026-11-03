@@ -54,6 +54,7 @@ class ChessBoard extends StatefulWidget {
     required this.orientation,
     this.onMove,
     this.lastMove,
+    this.lastMoveColor,
     this.arrows = const [],
     this.showCoordinates = true,
     this.badge,
@@ -65,6 +66,10 @@ class ChessBoard extends StatefulWidget {
   /// Null makes the board read-only.
   final void Function(NormalMove move)? onMove;
   final (Square, Square)? lastMove;
+
+  /// Colour of the last-move squares (default: the usual yellow), e.g. red
+  /// for a wrong puzzle move.
+  final Color? lastMoveColor;
   final List<BoardArrow> arrows;
   final bool showCoordinates;
 
@@ -188,6 +193,7 @@ class _ChessBoardState extends State<ChessBoard> {
               painter: _SquaresPainter(
                 orientation: widget.orientation,
                 lastMove: widget.lastMove,
+                lastMoveColor: widget.lastMoveColor ?? BoardColors.lastMove,
                 selected: shown,
                 dests: shown == null ? const {} : (_dests[shown] ?? const {}),
                 occupied: (s) => pos.board.pieceAt(s) != null,
@@ -363,6 +369,7 @@ class _SquaresPainter extends CustomPainter {
   _SquaresPainter({
     required this.orientation,
     required this.lastMove,
+    required this.lastMoveColor,
     required this.selected,
     required this.dests,
     required this.occupied,
@@ -374,6 +381,7 @@ class _SquaresPainter extends CustomPainter {
 
   final Side orientation;
   final (Square, Square)? lastMove;
+  final Color lastMoveColor;
   final Square? selected;
   final Set<Square> dests;
   final bool Function(Square) occupied;
@@ -401,7 +409,7 @@ class _SquaresPainter extends CustomPainter {
     final lm = lastMove;
     if (lm != null) {
       for (final s in [lm.$1, lm.$2]) {
-        canvas.drawRect(rect(s), Paint()..color = BoardColors.lastMove);
+        canvas.drawRect(rect(s), Paint()..color = lastMoveColor);
       }
     }
     if (selected != null) {
@@ -496,6 +504,7 @@ class _SquaresPainter extends CustomPainter {
   bool shouldRepaint(_SquaresPainter old) =>
       old.orientation != orientation ||
       old.lastMove != lastMove ||
+      old.lastMoveColor != lastMoveColor ||
       old.selected != selected ||
       old.dests != dests ||
       old.check != check ||
