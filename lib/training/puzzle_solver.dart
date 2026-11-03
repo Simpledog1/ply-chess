@@ -168,14 +168,23 @@ class PuzzleSolver {
     }
   }
 
+  /// Where the shown solution started, and each of its moves with the
+  /// position after it, so the screen can replay it step by step.
+  Position? revealFrom;
+  List<(Position, String)> revealSteps = const [];
+
   /// Plays out the rest of the solution; the puzzle counts as failed.
   void showSolution() {
+    revealFrom = position;
+    final steps = <(Position, String)>[];
     while (index < puzzle.moves.length) {
       final m = Move.parse(puzzle.moves[index])!;
       lastMove = puzzle.moves[index];
       position = position.play(m);
+      steps.add((position, lastMove!));
       index++;
     }
+    revealSteps = steps;
     failed = true;
   }
 

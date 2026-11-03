@@ -240,6 +240,16 @@ class _SettingsDialog extends StatelessWidget {
                     value: p.hintsEnabled,
                     onChanged: (v) => t.updatePreferences(hints: v),
                   ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Sound effects'),
+                    subtitle: const Text(
+                      'A short system sound for wrong and solved moves. '
+                      'Everything is also shown on screen.',
+                    ),
+                    value: p.sounds,
+                    onChanged: (v) => t.updatePreferences(sounds: v),
+                  ),
                   Text(
                     'Rating source: ${p.ratingSource.label}'
                     '${p.chessRating == null ? '' : ' (${p.chessRating})'}. '

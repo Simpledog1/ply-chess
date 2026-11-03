@@ -50,6 +50,24 @@ CollectionPlan plan(
   seed: 7,
 ) as CollectionPlan;
 
+/// A legal move in the session's position that is neither the expected
+/// move nor a checkmate (so the solver must reject it).
+NormalMove wrongMoveIn(PuzzleSession s) {
+  final pos = s.solver.position;
+  final expected = s.puzzle.moves[s.solver.index].substring(0, 4);
+  for (final e in pos.legalMoves.entries) {
+    for (final to in e.value.squares) {
+      final m = NormalMove(from: e.key, to: to);
+      if ('${e.key.name}${to.name}' != expected &&
+          pos.board.pieceAt(to)?.color != pos.turn && // not castling form
+          !pos.play(m).isCheckmate) {
+        return m;
+      }
+    }
+  }
+  throw StateError('No wrong move available');
+}
+
 /// Plays the solver's own solution through the controller.
 Future<void> solve(TrainingController c) async {
   final s = c.session!;
@@ -382,7 +400,9 @@ void main() {
         catalogue: catalogue,
         store: store,
         httpGet: get,
-        replyDelay: Duration.zero,
+        replyDelay: const Duration(milliseconds: 10),
+        wrongDelay: const Duration(milliseconds: 40),
+        stepDelay: const Duration(milliseconds: 5),
       );
     }
 
@@ -422,24 +442,140 @@ void main() {
       await c.createProfile(source: RatingSource.lichess, rating: 1500);
       c.nextCalibration();
       final s = c.session!;
-      final legal = s.solver.position.legalMoves;
-      final expected = s.puzzle.moves[1];
-      Move? wrong;
-      for (final e in legal.entries) {
-        for (final to in e.value.squares) {
-          final m = NormalMove(from: e.key, to: to);
-          if (!s.solver.position.play(m).isCheckmate &&
-              '${e.key.name}${to.name}' != expected.substring(0, 4)) {
-            wrong = m;
-          }
-        }
-      }
-      expect(c.play(wrong!), MoveVerdict.wrong);
+      expect(c.play(wrongMoveIn(s)), MoveVerdict.wrong);
       await solve(c);
       final a = c.profile!.calibration.single;
       expect(a.solved, isTrue);
       expect(a.firstTryCorrect, isFalse);
       expect(a.wrongMoves, 1);
+    });
+
+    group('move feedback', () {
+      test('Retry: the wrong move is shown, locked, then taken back', () async {
+        final c = await open();
+        await c.createProfile(source: RatingSource.lichess, rating: 1500);
+        c.nextCalibration();
+        final s = c.session!;
+        final start = s.solver.position.fen;
+        final wrong = wrongMoveIn(s);
+        expect(c.play(wrong), MoveVerdict.wrong);
+        // Shown on the board, marked wrong, input locked.
+        expect(s.feedback, MoveFeedback.wrong);
+        expect(s.message, 'Incorrect move. Try again.');
+        expect(s.boardPosition.fen, s.solver.start.play(wrong).fen);
+        expect(s.boardMove, s.solver.tried.last);
+        expect(s.busy, isTrue);
+        final right = Move.parse(s.puzzle.moves[1])!;
+        expect(c.play(right), MoveVerdict.ignored);
+        expect(s.solver.wrongMoves, 1); // the ignored move is not counted
+        // Then taken back: the real position is untouched.
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+        expect(s.busy, isFalse);
+        expect(s.shownPosition, isNull);
+        expect(s.boardPosition.fen, start);
+        // A correct retry is marked correct and continues.
+        expect(c.play(right), isNot(MoveVerdict.ignored));
+        expect(s.feedback, anyOf(MoveFeedback.correct, MoveFeedback.solved));
+        await solve(c);
+        expect(s.feedback, MoveFeedback.solved);
+        expect(s.message, 'Puzzle solved (with help).');
+        expect(c.profile!.calibration.single.wrongMoves, 1);
+      });
+
+      test('several wrong moves are all counted', () async {
+        final c = await open();
+        await c.createProfile(source: RatingSource.lichess, rating: 1500);
+        c.nextCalibration();
+        final s = c.session!;
+        for (var i = 0; i < 3; i++) {
+          expect(c.play(wrongMoveIn(s)), MoveVerdict.wrong);
+          await Future<void>.delayed(const Duration(milliseconds: 80));
+        }
+        await solve(c);
+        final a = c.profile!.calibration.single;
+        expect(a.wrongMoves, 3);
+        expect(a.solved, isTrue);
+        expect(a.tried.length, greaterThanOrEqualTo(4));
+      });
+
+      test('first-try solve is marked solved', () async {
+        final c = await open();
+        await c.createProfile(source: RatingSource.lichess, rating: 1500);
+        c.nextCalibration();
+        await solve(c);
+        expect(c.session!.feedback, MoveFeedback.solved);
+        expect(c.session!.message, 'Puzzle solved!');
+      });
+
+      test('Reveal: wrong move shown, then the solution played out', () async {
+        final c = await open();
+        await c.createProfile(
+          source: RatingSource.lichess,
+          rating: 1500,
+          wrongMove: WrongMoveBehavior.reveal,
+        );
+        c.nextCalibration();
+        final s = c.session!;
+        final wrong = wrongMoveIn(s);
+        expect(c.play(wrong), MoveVerdict.revealed);
+        expect(s.feedback, MoveFeedback.wrong);
+        expect(s.message, 'Incorrect move. Here is the solution.');
+        expect(s.boardPosition.fen, s.solver.start.play(wrong).fen);
+        expect(s.over, isTrue); // recorded as not solved straight away
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(s.feedback, MoveFeedback.solution);
+        for (var i = 0; i < 100 && s.busy; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+        expect(s.busy, isFalse);
+        expect(s.shownPosition, isNull);
+        expect(s.boardPosition.fen, s.solver.revealSteps.last.$1.fen);
+        expect(s.message, startsWith('The solution: '));
+        final a = c.profile!.calibration.single;
+        expect(a.solved, isFalse);
+        expect(a.firstTryCorrect, isFalse);
+        expect(a.wrongMoves, 1);
+      });
+
+      test('the Solution button replays the solution', () async {
+        final c = await open();
+        await c.createProfile(source: RatingSource.lichess, rating: 1500);
+        c.nextCalibration();
+        final s = c.session!;
+        c.showSolution();
+        expect(s.feedback, MoveFeedback.solution);
+        expect(s.boardPosition.fen, s.solver.start.fen);
+        expect(s.solutionArrow, s.puzzle.moves[1]);
+        for (var i = 0; i < 100 && s.busy; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+        expect(s.boardPosition.fen, s.solver.position.fen);
+        expect(c.profile!.calibration.single.solved, isFalse);
+      });
+
+      test('a restart mid-puzzle starts that puzzle afresh', () async {
+        final c = await open();
+        await c.createProfile(source: RatingSource.lichess, rating: 1500);
+        await c.skipCalibration();
+        await c.createCollection(
+          c.planCollection(50, seed: 4) as CollectionPlan,
+        );
+        c.nextInCycle();
+        final first = c.session!.puzzle.id;
+        c.play(wrongMoveIn(c.session!));
+        c.play(wrongMoveIn(c.session!)); // ignored while the first shows
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        // Ply closes before the puzzle is finished.
+        final again = await open();
+        expect(again.active!.currentCycle!.done, 0); // nothing recorded
+        again.nextInCycle();
+        expect(again.session!.puzzle.id, first);
+        expect(again.session!.solver.wrongMoves, 0);
+        expect(
+          again.session!.boardPosition.fen,
+          again.session!.solver.start.fen,
+        );
+      });
     });
 
     test(

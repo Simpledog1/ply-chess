@@ -5,7 +5,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:dartchess/dartchess.dart' show Move, Side;
+import 'package:dartchess/dartchess.dart' show Move, NormalMove, Side;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -145,6 +145,8 @@ void main() {
         training: TrainingController(
           catalogue: PuzzleCatalogue(dir),
           store: TrainingStore(dir),
+          // Long enough to capture the wrong-move feedback.
+          wrongDelay: const Duration(seconds: 10),
         ),
         tab: ValueNotifier(0),
         child: RepaintBoundary(key: key, child: const PlyApp()),
@@ -268,6 +270,23 @@ void main() {
     );
     t.nextInCycle();
     await shot('training_solve');
+    // A wrong move: shown in red with a cross, then taken back.
+    final ws = t.session!;
+    final expected = ws.puzzle.moves[1].substring(0, 4);
+    final pos = ws.solver.position;
+    NormalMove? wrong;
+    for (final e in pos.legalMoves.entries) {
+      for (final to in e.value.squares) {
+        if (wrong == null &&
+            '${e.key.name}${to.name}' != expected &&
+            pos.board.pieceAt(to)?.color != pos.turn) {
+          wrong = NormalMove(from: e.key, to: to);
+        }
+      }
+    }
+    t.play(wrong!);
+    await shot('training_wrong');
+    await tester.pump(const Duration(seconds: 11));
     final s = t.session!;
     while (!s.over) {
       // On the real clock: the final move saves the attempt to disk.

@@ -103,6 +103,7 @@ class TrainingProfile {
     this.preferredSize = 100,
     this.wrongMove = WrongMoveBehavior.retry,
     this.hintsEnabled = true,
+    this.sounds = false,
     List<Attempt>? calibration,
     this.calibrated = false,
     DateTime? createdAt,
@@ -123,6 +124,10 @@ class TrainingProfile {
   WrongMoveBehavior wrongMove;
   bool hintsEnabled;
 
+  /// Short system sounds for wrong and solved moves (all feedback is also
+  /// visible).
+  bool sounds;
+
   /// Calibration puzzles solved before the first collection.
   final List<Attempt> calibration;
   bool calibrated;
@@ -137,6 +142,7 @@ class TrainingProfile {
     'size': preferredSize,
     'wrongMove': wrongMove.name,
     'hints': hintsEnabled,
+    'sounds': sounds,
     'calibration': [for (final a in calibration) a.toJson()],
     'calibrated': calibrated,
     'created': createdAt.toIso8601String(),
@@ -153,6 +159,7 @@ class TrainingProfile {
       j['wrongMove'] as String? ?? 'retry',
     ),
     hintsEnabled: j['hints'] as bool? ?? true,
+    sounds: j['sounds'] as bool? ?? false,
     calibration: [
       for (final a in j['calibration'] as List? ?? const [])
         Attempt.fromJson(a as Map<String, dynamic>),

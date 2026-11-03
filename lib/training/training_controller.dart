@@ -3,8 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:dartchess/dartchess.dart' show Move;
+import 'package:dartchess/dartchess.dart' show Move, Position;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show SystemSound, SystemSoundType;
 
 import '../online/online_games.dart';
 import 'puzzle.dart';
@@ -31,15 +32,49 @@ class PuzzleSession {
   final DateTime startedAt;
   final Stopwatch clock;
 
-  /// The latest feedback line ("Correct", "Not this move", a hint...).
+  /// The latest feedback line ("Correct", "Incorrect move", a hint...).
   String? message;
   PuzzleHint? hint;
+
+  /// How the last move went, for the board's colours and animation.
+  /// [feedbackId] changes with every move, so animations replay.
+  MoveFeedback feedback = MoveFeedback.none;
+  int feedbackId = 0;
+
+  /// What the board shows instead of the solver's position for a moment:
+  /// a wrong move before it is taken back, or a step of the solution.
+  Position? shownPosition;
+  String? shownMove;
+
+  /// Arrow for the next solution move while the solution is replayed.
+  String? solutionArrow;
+
+  /// Feedback is playing: board and buttons ignore input until it ends.
+  bool busy = false;
 
   /// The recorded attempt once the puzzle is over.
   Attempt? result;
 
   Puzzle get puzzle => solver.puzzle;
   bool get over => result != null;
+  Position get boardPosition => shownPosition ?? solver.position;
+  String? get boardMove => shownMove ?? solver.lastMove;
+}
+
+enum MoveFeedback {
+  none,
+
+  /// The player's move was right; the reply follows.
+  correct,
+
+  /// The player's move was wrong (shown, then taken back or answered).
+  wrong,
+
+  /// The puzzle is solved.
+  solved,
+
+  /// The solution is being shown.
+  solution,
 }
 
 /// Progress of a puzzle download.
@@ -57,6 +92,8 @@ class TrainingController extends ChangeNotifier {
     HttpGet? httpGet,
     this.config = const RecommenderConfig(),
     this.replyDelay = const Duration(milliseconds: 450),
+    this.wrongDelay = const Duration(milliseconds: 900),
+    this.stepDelay = const Duration(milliseconds: 700),
   }) : _get = httpGet ?? defaultHttpGet {
     store.addListener(notifyListeners);
     catalogue.addListener(notifyListeners);
@@ -65,11 +102,30 @@ class TrainingController extends ChangeNotifier {
   final PuzzleCatalogue catalogue;
   final TrainingStore store;
   final RecommenderConfig config;
+
+  /// Pause before the opponent's reply, how long a wrong move stays on the
+  /// board, and the pace of a replayed solution.
   final Duration replyDelay;
+  final Duration wrongDelay;
+  final Duration stepDelay;
   final HttpGet _get;
 
   PuzzleSession? session;
   Timer? _reply;
+
+  /// Runs [f] for session [s] after [d], unless the puzzle changed.
+  void _later(PuzzleSession s, Duration d, VoidCallback f) {
+    _reply?.cancel();
+    _reply = Timer(d, () {
+      if (!identical(session, s)) return;
+      f();
+      notifyListeners();
+    });
+  }
+
+  void _sound(SystemSoundType t) {
+    if (profile?.sounds ?? false) SystemSound.play(t);
+  }
 
   TrainingProfile? get profile => store.profile;
   TrainingCollection? get active => store.active;
@@ -102,11 +158,13 @@ class TrainingController extends ChangeNotifier {
     int? size,
     WrongMoveBehavior? wrongMove,
     bool? hints,
+    bool? sounds,
   }) async {
     final p = profile!;
     if (size != null) p.preferredSize = size;
     if (wrongMove != null) p.wrongMove = wrongMove;
     if (hints != null) p.hintsEnabled = hints;
+    if (sounds != null) p.sounds = sounds;
     await store.saveProfile(p);
   }
 
@@ -240,27 +298,49 @@ class TrainingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// A move from the board.
+  /// A move from the board (tap or drag). Every move gets feedback:
+  /// a correct one is marked and answered; a wrong one stays on the board
+  /// for [wrongDelay] marked as wrong, then is taken back (Retry) or
+  /// followed by the solution (Reveal). Input is ignored meanwhile.
   MoveVerdict play(Move move) {
     final s = session;
-    if (s == null || s.over) return MoveVerdict.ignored;
+    if (s == null || s.over || s.busy) return MoveVerdict.ignored;
+    final before = s.solver.position;
     final v = s.solver.play(move);
+    if (v == MoveVerdict.ignored) return v;
     s.hint = null;
+    s.solutionArrow = null;
+    s.feedbackId++;
     switch (v) {
       case MoveVerdict.correct:
+        s.feedback = MoveFeedback.correct;
         s.message = 'Correct! Keep going.';
-        _reply = Timer(replyDelay, () {
+        s.busy = true;
+        _later(s, replyDelay, () {
           s.solver.reply();
-          notifyListeners();
+          s.feedback = MoveFeedback.none;
+          s.busy = false;
         });
       case MoveVerdict.solved:
-        s.message = s.solver.firstTryCorrect ? 'Solved!' : 'Solved.';
+        s.feedback = MoveFeedback.solved;
+        s.message = s.solver.firstTryCorrect
+            ? 'Puzzle solved!'
+            : 'Puzzle solved (with help).';
+        _sound(SystemSoundType.click);
         _finish(s);
       case MoveVerdict.wrong:
-        s.message = 'Not this move. Try again.';
+        _showWrong(s, before, move);
+        s.message = 'Incorrect move. Try again.';
+        _later(s, wrongDelay, () {
+          s.shownPosition = null;
+          s.shownMove = null;
+          s.busy = false;
+        });
       case MoveVerdict.revealed:
-        s.message = 'Not this move. Here is the solution.';
+        _showWrong(s, before, move);
+        s.message = 'Incorrect move. Here is the solution.';
         _finish(s);
+        _later(s, wrongDelay, () => _replaySolution(s, 0));
       case MoveVerdict.ignored:
         break;
     }
@@ -268,9 +348,47 @@ class TrainingController extends ChangeNotifier {
     return v;
   }
 
+  /// Puts the wrong [move] on the board for a moment, marked as wrong.
+  void _showWrong(PuzzleSession s, Position before, Move move) {
+    s.feedback = MoveFeedback.wrong;
+    s.shownPosition = before.play(move);
+    s.shownMove = s.solver.tried.last;
+    s.busy = true;
+    _sound(SystemSoundType.alert);
+  }
+
+  /// Replays the shown solution move by move from where it started, with
+  /// an arrow before each move.
+  void _replaySolution(PuzzleSession s, int i) {
+    final steps = s.solver.revealSteps;
+    s.feedback = MoveFeedback.solution;
+    if (i == 0) {
+      s.shownPosition = s.solver.revealFrom;
+      s.shownMove = null;
+      s.message = 'The solution: ${formatSolution(s.puzzle)}';
+    }
+    if (i >= steps.length) {
+      s.shownPosition = null;
+      s.shownMove = null;
+      s.solutionArrow = null;
+      s.busy = false;
+      return;
+    }
+    s.busy = true;
+    s.solutionArrow = steps[i].$2;
+    _later(s, stepDelay, () {
+      s.shownPosition = steps[i].$1;
+      s.shownMove = steps[i].$2;
+      s.solutionArrow = null;
+      _later(s, stepDelay, () => _replaySolution(s, i + 1));
+    });
+  }
+
   void hint() {
     final s = session;
-    if (s == null || s.over || !(profile?.hintsEnabled ?? true)) return;
+    if (s == null || s.over || s.busy || !(profile?.hintsEnabled ?? true)) {
+      return;
+    }
     s.hint = s.solver.hint();
     s.message = s.hint!.text;
     notifyListeners();
@@ -278,10 +396,11 @@ class TrainingController extends ChangeNotifier {
 
   void resetPuzzle() {
     final s = session;
-    if (s == null || s.over) return;
+    if (s == null || s.over || s.busy) return;
     _reply?.cancel();
     s.solver.reset();
     s.hint = null;
+    s.feedback = MoveFeedback.none;
     s.message = 'Back to the start position.';
     notifyListeners();
   }
@@ -289,18 +408,18 @@ class TrainingController extends ChangeNotifier {
   /// Gives up: the solution is shown and the puzzle counts as failed.
   void showSolution() {
     final s = session;
-    if (s == null || s.over) return;
+    if (s == null || s.over || s.busy) return;
     _reply?.cancel();
     s.solver.showSolution();
-    s.message = 'Here is the solution.';
     _finish(s);
+    _replaySolution(s, 0);
     notifyListeners();
   }
 
   /// Skips the puzzle: recorded as abandoned (never as solved).
   void skip() {
     final s = session;
-    if (s == null || s.over) return;
+    if (s == null || s.over || s.busy) return;
     _reply?.cancel();
     s.message = 'Skipped.';
     _finish(s, skipped: true);

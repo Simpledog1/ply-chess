@@ -50,6 +50,28 @@ class _SolveView extends StatelessWidget {
   }
 }
 
+const _wrongColor = Color(0xFFE5403A);
+
+(Square, Square)? _squares(String? uci) => uci == null
+    ? null
+    : (
+        Square.fromName(uci.substring(0, 2)),
+        Square.fromName(uci.substring(2, 4)),
+      );
+
+/// A round marker for a square: ✗ for a wrong move, ✓ for a right one.
+Widget _mark(IconData icon, Color color) => Container(
+  decoration: BoxDecoration(
+    color: color,
+    shape: BoxShape.circle,
+    boxShadow: const [BoxShadow(blurRadius: 3, color: Colors.black45)],
+  ),
+  child: Icon(icon, size: 16, color: Colors.white),
+);
+
+/// The puzzle board. It shows what the session wants seen: a wrong move
+/// in red (then taken back), a right move in green, the solution step by
+/// step. Moves are only accepted when no feedback is playing.
 class _PuzzleBoard extends StatelessWidget {
   const _PuzzleBoard();
 
@@ -58,51 +80,133 @@ class _PuzzleBoard extends StatelessWidget {
     final t = _watch(context);
     final s = t.session!;
     final sol = s.solver;
-    final last = sol.lastMove;
     final hint = s.hint;
+    final fb = s.feedback;
+    final last = s.boardMove;
+    // The move just made by the player (not the opponent's reply).
+    final playerMove =
+        last != null &&
+        (s.shownMove != null ||
+            fb == MoveFeedback.correct ||
+            fb == MoveFeedback.solved);
+    final wrongShown = fb == MoveFeedback.wrong && s.shownMove != null;
+    final good = fb == MoveFeedback.correct || fb == MoveFeedback.solved;
+    final frame = wrongShown
+        ? _wrongColor
+        : good
+        ? classColorGood
+        : null;
+    final (Square, Widget)? badge = wrongShown
+        ? (_squares(last)!.$2, _mark(Icons.close, _wrongColor))
+        : good && playerMove
+        ? (_squares(last)!.$2, _mark(Icons.check, classColorGood))
+        : hint?.from != null && hint?.move == null
+        ? (
+            hint!.from!,
+            Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFFF2BE2B),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.lightbulb,
+                size: 14,
+                color: Colors.black87,
+              ),
+            ),
+          )
+        : null;
+    final arrow = s.solutionArrow ?? hint?.move;
     return LayoutBuilder(
       builder: (context, c) {
         final size = math.min(c.maxWidth, c.maxHeight);
-        return SizedBox.square(
-          dimension: size,
-          child: ChessBoard(
-            position: sol.position,
-            orientation: sol.solver,
-            lastMove: last == null
-                ? null
-                : (
-                    Square.fromName(last.substring(0, 2)),
-                    Square.fromName(last.substring(2, 4)),
-                  ),
-            arrows: [
-              if (hint?.move case final m?)
-                BoardArrow(
-                  Square.fromName(m.substring(0, 2)),
-                  Square.fromName(m.substring(2, 4)),
+        return _Shake(
+          trigger: wrongShown ? s.feedbackId : 0,
+          child: SizedBox.square(
+            dimension: size,
+            child: DecoratedBox(
+              position: DecorationPosition.foreground,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: frame?.withValues(alpha: 0.85) ?? Colors.transparent,
+                  width: 3,
                 ),
-            ],
-            badge: hint?.from == null || hint?.move != null
-                ? null
-                : (
-                    hint!.from!,
-                    Container(
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF2BE2B),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.lightbulb,
-                        size: 14,
-                        color: Colors.black87,
-                      ),
+              ),
+              child: ChessBoard(
+                position: s.boardPosition,
+                orientation: sol.solver,
+                lastMove: _squares(last),
+                lastMoveColor: wrongShown
+                    ? _wrongColor.withValues(alpha: 0.55)
+                    : good && playerMove
+                    ? classColorGood.withValues(alpha: 0.55)
+                    : null,
+                arrows: [
+                  if (arrow != null)
+                    BoardArrow(
+                      _squares(arrow)!.$1,
+                      _squares(arrow)!.$2,
+                      s.solutionArrow != null
+                          ? classColorGood.withValues(alpha: 0.85)
+                          : BoardColors.arrow,
                     ),
-                  ),
-            onMove: s.over || sol.replyPending ? null : t.play,
+                ],
+                badge: badge,
+                onMove: s.over || s.busy || sol.replyPending ? null : t.play,
+              ),
+            ),
           ),
         );
       },
     );
   }
+}
+
+/// Shakes its child sideways briefly whenever [trigger] changes to a
+/// non-zero value. Skipped when the system asks for reduced motion.
+class _Shake extends StatefulWidget {
+  const _Shake({required this.trigger, required this.child});
+  final int trigger;
+  final Widget child;
+
+  @override
+  State<_Shake> createState() => _ShakeState();
+}
+
+class _ShakeState extends State<_Shake> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 360),
+  );
+
+  @override
+  void didUpdateWidget(_Shake old) {
+    super.didUpdateWidget(old);
+    final calm = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (widget.trigger != 0 && widget.trigger != old.trigger && !calm) {
+      _c.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _c,
+    child: widget.child,
+    builder: (context, child) {
+      final v = _c.value;
+      final dx = v == 0 || v == 1
+          ? 0.0
+          : math.sin(v * math.pi * 6) * 8 * (1 - v);
+      return Transform.translate(offset: Offset(dx, 0), child: child);
+    },
+  );
 }
 
 class _SolvePanel extends StatelessWidget {
@@ -180,7 +284,16 @@ class _SolvePanel extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              if (s.message != null) _Feedback(s),
+              // Fades in each new message, so every move visibly registers.
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: s.message == null
+                    ? const SizedBox.shrink()
+                    : KeyedSubtree(
+                        key: ValueKey('${s.feedbackId} ${s.message}'),
+                        child: _Feedback(s),
+                      ),
+              ),
               const SizedBox(height: 12),
               if (!s.over)
                 Wrap(
@@ -193,7 +306,9 @@ class _SolvePanel extends StatelessWidget {
                             'First the theme, then the piece, then the '
                             'move. Costs first-try credit.',
                         child: OutlinedButton.icon(
-                          onPressed: s.solver.replyPending ? null : t.hint,
+                          onPressed: s.busy || s.solver.replyPending
+                              ? null
+                              : t.hint,
                           icon: const Icon(Icons.lightbulb_outline, size: 18),
                           label: Text(
                             s.solver.hintLevel == 0
@@ -205,7 +320,7 @@ class _SolvePanel extends StatelessWidget {
                     Tooltip(
                       message: 'Back to the starting position',
                       child: OutlinedButton.icon(
-                        onPressed: t.resetPuzzle,
+                        onPressed: s.busy ? null : t.resetPuzzle,
                         icon: const Icon(Icons.restart_alt, size: 18),
                         label: const Text('Reset'),
                       ),
@@ -215,7 +330,7 @@ class _SolvePanel extends StatelessWidget {
                           'Show the solution; the puzzle counts as not '
                           'solved',
                       child: OutlinedButton.icon(
-                        onPressed: t.showSolution,
+                        onPressed: s.busy ? null : t.showSolution,
                         icon: const Icon(Icons.visibility_outlined, size: 18),
                         label: const Text('Solution'),
                       ),
@@ -223,7 +338,7 @@ class _SolvePanel extends StatelessWidget {
                     Tooltip(
                       message: 'Skip this puzzle (recorded as skipped)',
                       child: TextButton(
-                        onPressed: t.skip,
+                        onPressed: s.busy ? null : t.skip,
                         child: const Text('Skip'),
                       ),
                     ),
@@ -298,8 +413,9 @@ class _Feedback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final good = s.solver.solved || (s.message?.startsWith('Correct') ?? false);
-    final bad = s.message?.startsWith('Not this move') ?? false;
+    final good =
+        s.feedback == MoveFeedback.correct || s.feedback == MoveFeedback.solved;
+    final bad = s.feedback == MoveFeedback.wrong;
     final color = good
         ? classColorGood
         : bad
