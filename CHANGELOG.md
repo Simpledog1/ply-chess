@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.4.1 — Puzzle move feedback
+
+### Fixed
+- A wrong move in a puzzle no longer seems to do nothing: it stays on the
+  board for a moment in red with a cross, the board shakes briefly,
+  "Incorrect move. Try again." appears, and the piece goes back. With
+  "Show the solution" selected, the wrong move is shown and then the
+  solution is played out move by move, with an arrow before each move.
+
+### Changed
+- Correct moves are marked green with a tick before the reply; a solved
+  puzzle says so ("Puzzle solved!").
+- While feedback plays, the board and the Hint / Reset / Solution / Skip
+  buttons ignore input, so quick extra clicks or drags cannot slip
+  through. Clicks and drags get the same feedback.
+- The Solution button replays the solution step by step instead of
+  jumping to the end.
+
+### Added
+- Optional sound effects for wrong and solved moves (Training settings,
+  off by default).
+
 ## 1.4.0 — Puzzle Training (Woodpecker method)
 
 ### Added

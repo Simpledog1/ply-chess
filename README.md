@@ -19,8 +19,8 @@ Stockfish 19 analysis (`test/render_screens_test.dart`). The game is Morphy's
 
 ## Install on Windows
 
-1. Download `Ply-Setup-1.4.0.exe` (or the portable
-   `Ply-1.4.0-windows-x64-portable.zip`).
+1. Download `Ply-Setup-1.4.1.exe` (or the portable
+   `Ply-1.4.1-windows-x64-portable.zip`).
 2. Run the installer. It installs for your user only, needs no administrator
    rights, adds Ply to the Start menu and optionally to the desktop.
    *Portable zip:* unzip anywhere and run `Ply\Ply.exe`.
@@ -291,7 +291,7 @@ Installer (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)):
 ISCC.exe installer\ply.iss
 ```
 
-Output: `build\installer\Ply-Setup-1.4.0.exe`.
+Output: `build\installer\Ply-Setup-1.4.1.exe`.
 
 **Android** (arm64, Android 10+): `flutter build apk --release
 --target-platform android-arm64`; Gradle downloads and verifies the official
