@@ -106,6 +106,30 @@ Hints: 1 = theme, 2 = which piece (badge on the board), 3 = the move
 abandoned attempt; Solution records a failed one. Pausing mid-puzzle records
 nothing; that puzzle starts again with a fresh clock.
 
+### Move feedback
+
+Every move gets visible feedback (`TrainingController.play`,
+`PuzzleSession.feedback`, `_PuzzleBoard`). The solver's position never
+holds a wrong move: the session shows one temporarily through
+`shownPosition` / `shownMove`, and `busy` makes the board read-only and
+disables Hint, Reset, Solution and Skip while feedback plays, so rapid
+input cannot slip through. Clicks and drags reach the same `play`.
+
+| Result | Board | Panel |
+|---|---|---|
+| Correct | move squares green, ✓ on the target, green frame; the reply follows after `replyDelay` (450 ms) | "Correct! Keep going." |
+| Solved | the same green marking | "Puzzle solved!" (or "…(with help)"), then the result card |
+| Wrong, Retry | the move stays on the board for `wrongDelay` (900 ms): squares red, ✗ on the target, red frame, a short sideways shake; then the piece goes back | "Incorrect move. Try again." (stays red until the next move) |
+| Wrong, Reveal | the wrong move as above, then the solution replayed from the starting point: an arrow before each move, one step every `stepDelay` (700 ms), ending on the final position | "Incorrect move. Here is the solution.", then the numbered solution |
+| Solution button | the same replay | the numbered solution |
+
+The shake is skipped when the system asks for reduced animations. Sounds
+are optional (Training settings → Sound effects, off by default): a system
+alert for wrong moves and a click for a solved puzzle, through
+`SystemSound`; on Windows the click may be silent. Nothing depends on sound.
+Each new message fades in, so a repeated wrong move still visibly
+registers.
+
 ## Recommendations (`recommender.dart`, all numbers in `RecommenderConfig`)
 
 These are Ply's own, explainable rules, not a published standard.

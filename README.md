@@ -126,10 +126,15 @@ patterns become automatic.
    mastered. Close Ply at any time; **Continue training** resumes at the
    same puzzle.
 5. **While solving**: the board is yours; Ply plays the opponent's replies.
-   **Hint** (theme, then the piece, then the move), **Reset**, **Solution**
-   and **Skip** are on the right. After each puzzle you see whether you
-   solved it first try, the tactical idea, the full solution, your time,
-   mistakes and hints.
+   Every move gets feedback: a correct move turns green with a tick; a
+   wrong one stays on the board for a moment in red with a cross and a
+   short shake, "Incorrect move. Try again." appears, and the piece goes
+   back (with **show the solution** selected, the solution is played out
+   move by move instead). **Hint** (theme, then the piece, then the move),
+   **Reset**, **Solution** and **Skip** are on the right. After each puzzle
+   you see whether you solved it first try, the tactical idea, the full
+   solution, your time, mistakes and hints. Optional sound effects are in
+   Training settings.
 6. **Results** after every cycle compare cycles and themes. After the third
    cycle Ply summarises what improved and what is still hard, explains how
    the next collection changes (a little harder, the same, or easier, from
